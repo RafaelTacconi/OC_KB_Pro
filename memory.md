@@ -132,6 +132,16 @@ two small chunks fit the 3000-token budget after the oversized one is skipped, t
 because its two 2600-token chunks are each too big to coexist. Both were green in the 8-pass
 run after the §7.2 one-liner.
 
+### 2026-09-11 — hybrid_search now returns (chunks, degraded), not a list
+`§7.3` changed the contract: `retrieval/hybrid_search.py::hybrid_search()` returns
+`tuple[list[dict], bool]` where the bool is True when semantic search was unavailable and the
+results are lexical-only. Exactly two callers exist and both were updated in Step 2:
+`ui/chat_view.py::_run_turn` (surfaces the §7.3 note via `wa_semantic_degraded`) and
+`tests/offline_retrieval_eval.py::run_eval`. The eval harness RAISES on degrade rather than
+falling back (owner-directed): a silent fallback would make hybrid and lexical-only produce
+identical rows and falsely suggest hybrid adds nothing. lexical_search failures are NOT part
+of the degrade path and propagate to the §7.1 handler.
+
 ---
 
 ## Rejected approaches
@@ -157,5 +167,14 @@ gone. This is a direct consequence of applying §7.1 exactly (do not persist an 
 message containing the error, or it would pollute the Chat and, under Option B, the model's
 own context). Not changed for Step 1; flagged for the project owner if longer-lived retry
 (an assistant placeholder row, or re-running by sending the same text again) is wanted.
+
+### 2026-09-11 — Embedding-model load failures are now remembered for the session
+`ingestion/embedding.py::_get_model()` previously only cached a successful load, so every
+call after a failure re-attempted the model download. Once §7.3 made `hybrid_search()` catch
+instead of crash, every chat turn would have re-attempted it — paying a network/model timeout
+per turn. Changed (owner-approved, see decision for Step 1 — point 3): a failed load is stored
+in `_model_load_error` and every subsequent call raises fast with a short message pointing at
+the root cause; recovering requires an app restart once the model/network works. Logged as a
+deviation from the previous behaviour at the owner's request.
 
 ---

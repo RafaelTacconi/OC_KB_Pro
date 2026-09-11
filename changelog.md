@@ -7,6 +7,73 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Step 2 — Resilience (§7.3 + §7.4)
+
+Second implementation step. Chat turns survive an unavailable embedding model
+with a visible degrade note, and every destructive delete requires an explicit
+second confirmation.
+
+**Modified**
+- `retrieval/hybrid_search.py` — `hybrid_search()` now returns
+  `(chunks: list[dict], degraded: bool)`. `semantic_search()` runs inside
+  `try/except Exception`; on failure the merged result is lexical-only and
+  `degraded=True` (SPEC §7.3). A pure `lexical_search()` failure still
+  propagates to the `§7.1` handler — it is not part of the degrade path.
+- `ui/chat_view.py` — `_run_turn()` returns the degrade flag; `_answer()` and
+  `_retry()` clear `wa_semantic_degraded` at the start of a send and set it on
+  a successful-but-degraded turn; `render_chat_view()` shows a visible warning
+  when it is set ("…lexical (keyword) search only…"). The note survives until
+  the next send, mirroring `wa_pending_error`'s lifecycle.
+- `ingestion/embedding.py` — `_get_model()` now remembers a FAILED load in
+  `_model_load_error` and raises it fast on every later call. Previously each
+  call after a failure re-attempted the download; with `§7.3` catching, that
+  would have meant a network timeout on every chat turn. Owner-approved
+  deviation from prior behaviour — see `memory.md`.
+- `ui/owner_view.py` — two-step delete confirmation (SPEC §7.4) for both
+  Sources and Tasks via a shared `_render_delete_confirmation()` helper
+  (warning naming the item + Confirm delete / Cancel). First click only sets a
+  session-state flag keyed by entity id; only "Confirm delete" performs the
+  deletion. Task deletion's confirm/cancel renders OUTSIDE the edit form (a
+  form's submit buttons can't host the confirm step — the form resets on
+  submit). Task expanders and form buttons gained explicit keys so the confirm
+  survives the rerun and is testable.
+- `tests/offline_retrieval_eval.py` — updated to the new `hybrid_search`
+  contract AND made the harness refuse to run degraded: it raises if
+  `degraded` is True (owner-directed). A silent fallback would make hybrid and
+  lexical-only produce identical rows and falsely suggest hybrid adds nothing.
+
+**Added**
+- `tests/test_hybrid_search_degrade.py` — §7.3: semantic failure degrades to
+  lexical-only and signals it; both rankers merge cleanly on success; a
+  lexical failure still propagates.
+- `tests/test_delete_confirmations.py` — A16, end-to-end via AppTest from the
+  Manage surface: arming a delete deletes nothing, Cancel dismisses, only
+  "Confirm delete" removes the row — for both a Task (seeded) and a Source
+  (fake row inserted into the temp DB).
+
+**Schema and migration changes**
+- None. `db.py` untouched in this step; the `chats` table and indexes are
+  Step 3.
+
+**Acceptance criteria satisfied**
+- A15 — a chat turn with the embedding model unavailable yields lexical-only
+  results and the UI states semantic retrieval was unavailable (the degrade
+  signal + note; full end-to-end still awaits a live model endpoint, which is
+  out of scope of this step).
+- A16 — deleting a Source or a Task requires an explicit second confirmation
+  naming the item.
+- A18/A19 — journal maintained (see `memory.md`).
+
+**Known-broken / deferred**
+- `_call_internal_gateway()` still raises `NotImplementedError` — by design.
+- Embedding model failure is remembered for the session; recovering requires
+  an app restart (memory.md deviation).
+- The `§7.1` "create the `chats` row" clause remains deferred to Step 4.
+- A failed turn still leaves a persisted user message with no answer and no
+  retry once the session ends (memory.md deviation).
+
+---
+
 ## 2026-09-11 — Step 1 — Unblock the app (§7.2 + §7.1)
 
 First implementation step. The app now fails gracefully when the stub model
