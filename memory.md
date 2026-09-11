@@ -20,13 +20,15 @@ Outcome: Deferred — not reached.
 Authority: Deferred — not reached.
 Consequence: `SPEC.md` may contradict v2 in ways nobody can currently detect.
 
-### OPEN-2 — `call_model` signature and registry accuracy
+### OPEN-2 — `call_model` signature and registry accuracy — 2026-09-11 (Addendum A)
 Question: Is widening constraint C4 to `call_model(prompt, model_id)` approved? Are the
 `provider_model_name` slugs and 256k context figures in `models/registry.py` correct?
-Outcome: Deferred — not reached.
-Authority: Deferred — not reached.
-Consequence: The registry's context-window numbers feed `fits_in_context()`; wrong numbers
-mean a wrong guard.
+Outcome: Partially answered by Addendum A (`SPEC.md` §14.4): the widened signature
+`call_model(prompt, model_id) -> str` is confirmed to stay. Real slugs / base URL / key move
+to `.env` (§14.3). Still open: each model's real `context_window_tokens`.
+Authority: Answered by project owner on 2026-09-11 (signature); context windows still
+Deferred — not reached.
+Consequence: `fits_in_context()` keeps using 256k until the real windows are confirmed.
 
 ### OPEN-3 — Does chat history enter the prompt?
 Question: Do a Chat's prior turns go into the assembled prompt (`SPEC.md` §3.3, §6.5)?
@@ -83,6 +85,32 @@ Question: Is there a cross-Workspace question path — searching several Workspa
 Outcome: Deferred — not reached.
 Authority: Deferred — not reached.
 Consequence: This is the main functional cost of Workspace segregation (`SPEC.md` §3.1).
+
+### OPEN-11 — Which OpenAI-compatible client?
+Question: Is the endpoint an OpenAI-compatible proxy, Azure OpenAI, or `api.openai.com`
+directly (`SPEC.md` §14.4)?
+Outcome: Deferred — not reached.
+Authority: Deferred — not reached.
+Consequence: Azure needs a different client class, an `api-version`, and deployment names
+rather than model slugs. §14.4 says implement the OpenAI-compatible case and stop/ask if a
+real call suggests Azure.
+
+### OPEN-12 — Who sees the pre-expiry warning?
+Question: The brief says "the relevant users" see the pre-expiry key warning (`SPEC.md` §14.5)
+— who exactly?
+Outcome: Deferred — not reached.
+Authority: Deferred — not reached.
+Consequence: Interim is `expiring`/`unknown` to Owners; `expired` to all. Members cannot renew
+a key, but their chat breaks when it lapses.
+
+### OPEN-13 — Authentication on an internal deployment
+Question: The internally deployed app has no authentication — anyone reaching the port can
+sign in as Owner and manage/delete any Workspace (`SPEC.md` §14.1). Network-restricted host,
+or a gate before deployment?
+Outcome: Deferred — not reached.
+Authority: Deferred — not reached.
+Consequence: Constraint C6 was written for laptop testing; do NOT build authentication in
+response to this — flag it and continue.
 
 ---
 
@@ -142,6 +170,15 @@ falling back (owner-directed): a silent fallback would make hybrid and lexical-o
 identical rows and falsely suggest hybrid adds nothing. lexical_search failures are NOT part
 of the degrade path and propagate to the §7.1 handler.
 
+### 2026-09-11 — A degraded answer is persisted identically to a grounded one — note for Step 6
+After §7.3, a successful-but-degraded turn persists its assistant message with **no marker**
+distinguishing it from a fully-grounded one: the degrade only lives in session state
+(`wa_semantic_degraded`, which survives until the next send). There is no column on
+`chat_messages` for it, and `cited_sources`/`retrieved_chunk_ids` are the same shape either
+way. **Step 6 (visibility) should decide whether to record the degrade on the message** —
+e.g. a marker in the message or a `degraded` column — rather than relying on the
+session-only note. Not built now; the spec (§7.3) requires only the visible note.
+
 ---
 
 ## Rejected approaches
@@ -176,5 +213,14 @@ per turn. Changed (owner-approved, see decision for Step 1 — point 3): a faile
 in `_model_load_error` and every subsequent call raises fast with a short message pointing at
 the root cause; recovering requires an app restart once the model/network works. Logged as a
 deviation from the previous behaviour at the owner's request.
+
+### 2026-09-11 — The failure cache also affects ingestion — supersedes part of the entry above
+The `_model_load_error` cache is **module-global and shared with ingestion**: `embed_batch()`
+(called by `ingestion/pipeline.py::ingest_source()`) goes through the same `_get_model()`.
+So one transient embedding-model failure during a chat now also makes **uploads fail fast
+until the app restarts** — the owner flagged this side effect was not named in the entry
+above. Consequence: a flaky network that fails once can silently take down chat AND uploads
+for the rest of the session with no retry. Accepted for the PoC (restart is the recovery);
+recorded here complete.
 
 ---
