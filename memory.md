@@ -20,15 +20,25 @@ Outcome: Deferred — not reached.
 Authority: Deferred — not reached.
 Consequence: `SPEC.md` may contradict v2 in ways nobody can currently detect.
 
-### OPEN-2 — `call_model` signature and registry accuracy — 2026-09-11 (Addendum A)
+### OPEN-2 — `call_model` signature and registry accuracy
 Question: Is widening constraint C4 to `call_model(prompt, model_id)` approved? Are the
 `provider_model_name` slugs and 256k context figures in `models/registry.py` correct?
-Outcome: Partially answered by Addendum A (`SPEC.md` §14.4): the widened signature
-`call_model(prompt, model_id) -> str` is confirmed to stay. Real slugs / base URL / key move
-to `.env` (§14.3). Still open: each model's real `context_window_tokens`.
+Outcome: Deferred — not reached.
+Authority: Deferred — not reached.
+Consequence: The registry's context-window numbers feed `fits_in_context()`; wrong numbers
+mean a wrong guard.
+
+### OPEN-2 — `call_model` signature and registry accuracy — 2026-09-11 (supersedes entry above)
+Question: Is widening constraint C4 to `call_model(prompt, model_id)` approved? Are the
+`provider_model_name` slugs and 256k context figures in `models/registry.py` correct?
+Outcome: Signature confirmed — `call_model(prompt, model_id) -> str` stays (§14.4, A25).
+Real base URL / key / slugs move to `.env` (§14.3) via a lazy `provider_model_name()`
+read in `models/registry.py`. Still open: each model's real `context_window_tokens`.
 Authority: Answered by project owner on 2026-09-11 (signature); context windows still
 Deferred — not reached.
 Consequence: `fits_in_context()` keeps using 256k until the real windows are confirmed.
+NOTE: this entry was first written by EDITING the entry above in place (a §13.2 violation),
+then restored to append-only form on 2026-09-11. No content was lost.
 
 ### OPEN-3 — Does chat history enter the prompt?
 Question: Do a Chat's prior turns go into the assembled prompt (`SPEC.md` §3.3, §6.5)?
@@ -214,6 +224,15 @@ gone. This is a direct consequence of applying §7.1 exactly (do not persist an 
 message containing the error, or it would pollute the Chat and, under Option B, the model's
 own context). Not changed for Step 1; flagged for the project owner if longer-lived retry
 (an assistant placeholder row, or re-running by sending the same text again) is wanted.
+
+### 2026-09-11 — Steps 3 and 4 are landed TOGETHER in one commit
+SPEC §9 lists Step 3 (schema/migration) and Step 4 (multi-Chat UI) as separate steps, but
+from the 2026-09-11 session they ship as one commit. Split up, `_save_message()` would write
+`chat_id = NULL` between the two commits — the exact state A10 forbids, self-healed only by
+the next `migrate_db()` run. Landing migration + the Chat features that use `chat_id`
+atomically means no NULL-chat_id window ever exists. Decision recorded in `state.md`;
+approved by project owner on 2026-09-11. Same one-commit pattern as Step 2b (registry split +
+picker + adapter shipped together).
 
 ### 2026-09-11 — Embedding-model load failures are now remembered for the session
 `ingestion/embedding.py::_get_model()` previously only cached a successful load, so every

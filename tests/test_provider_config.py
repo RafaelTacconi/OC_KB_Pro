@@ -28,9 +28,17 @@ def _env(monkeypatch: pytest.MonkeyPatch, **values: str) -> None:
         monkeypatch.setenv(k, v)
 
 
+def _endpoint_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove the endpoint vars so each sub-case starts from a clean slate."""
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+
 def test_list_models_omits_unconfigured_slugs(monkeypatch):
     _env(
         monkeypatch,
+        OPENAI_BASE_URL="http://proxy/v1",
+        OPENAI_API_KEY="k",
         OPENAI_MODEL_FAST="fast-real",
         OPENAI_MODEL_STANDARD="",
         OPENAI_MODEL_REASONING="reason-real",
@@ -42,11 +50,29 @@ def test_list_models_omits_unconfigured_slugs(monkeypatch):
 def test_list_models_empty_when_nothing_configured(monkeypatch):
     _env(
         monkeypatch,
+        OPENAI_BASE_URL="http://proxy/v1",
+        OPENAI_API_KEY="k",
         OPENAI_MODEL_FAST="",
         OPENAI_MODEL_STANDARD="",
         OPENAI_MODEL_REASONING="",
     )
     assert list_models() == []
+
+
+def test_list_models_empty_when_key_or_base_url_missing(monkeypatch):
+    # SPEC §14.3 partial-config: slugs set but no API key/base URL. A model
+    # that cannot be called must not show, so the picker surfaces the
+    # "no model configured" message (A20 extension).
+    _endpoint_env(monkeypatch)  # clears OPENAI_BASE_URL + OPENAI_API_KEY
+    _env(monkeypatch, OPENAI_MODEL_FAST="fast-real")
+    assert list_models() == []  # no key, no base URL
+
+    _env(monkeypatch, OPENAI_API_KEY="k")
+    assert list_models() == []  # key set, base URL missing
+
+    _endpoint_env(monkeypatch)
+    _env(monkeypatch, OPENAI_BASE_URL="http://proxy/v1")
+    assert list_models() == []  # base URL set, key missing
 
 
 def test_provider_model_name_is_lazy_and_blank_when_unset(monkeypatch):

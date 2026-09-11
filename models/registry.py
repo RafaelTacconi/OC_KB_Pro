@@ -109,9 +109,18 @@ def provider_model_name(model_id: str) -> str:
 
 def list_models() -> list[ModelSpec]:
     """
-    Only models whose .env slug is configured (SPEC §14.3 resolution rules).
-    A ModelSpec whose slug env var is empty is omitted — never show a model
-    that cannot be called. If the default's slug is unconfigured, callers
-    must fall back to the first configured model (see ui/chat_view.py).
+    Only models whose .env config is complete (SPEC §14.3 resolution rules).
+
+    A model is omitted unless BOTH the endpoint is configured (base URL + API
+    key present — §14.2) and that model's slug env var is set. Never show a
+    model that cannot be called: with slugs set but no key/base URL, the list
+    is empty and the UI shows the "no model configured" message (A20 covers
+    partial config, not only a missing .env). If the default's slug is
+    unconfigured, callers must fall back to the first configured model (see
+    ui/chat_view.py).
     """
+    base_url = os.environ.get("OPENAI_BASE_URL", "").strip()
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not base_url or not api_key:
+        return []
     return [m for m in AVAILABLE_MODELS if provider_model_name(m.model_id)]

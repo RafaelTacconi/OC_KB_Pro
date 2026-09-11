@@ -22,6 +22,8 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from models.registry import list_models
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -30,26 +32,48 @@ def _env(monkeypatch: pytest.MonkeyPatch, **values: str) -> None:
         monkeypatch.setenv(k, v)
 
 
+def _run_no_model_check(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> AppTest:
+    monkeypatch.chdir(tmp_path)
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()
+    assert not at.exception, list(at.exception)
+    assert any("No AI model is configured" in w.value for w in at.warning)
+
+    # Manage still works for the owner.
+    at.button(key="nav_manage").click().run()
+    assert not at.exception, list(at.exception)
+    assert at.radio(key="wa_manage_section").value == "Knowledge"
+    return at
+
+
 def test_a20_no_env_no_stack_trace_and_no_model_message(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.chdir(tmp_path)
-    os.environ["HF_HUB_OFFLINE"] = "1"
     # Ensure nothing is configured.
     monkeypatch.delenv("OPENAI_MODEL_FAST", raising=False)
     monkeypatch.delenv("OPENAI_MODEL_STANDARD", raising=False)
     monkeypatch.delenv("OPENAI_MODEL_REASONING", raising=False)
+    _run_no_model_check(monkeypatch, tmp_path)
 
-    at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()
-    assert not at.exception
-    assert any(
-        "No AI model is configured" in w.value for w in at.warning
+
+def test_a20_partial_config_missing_key_or_base_url(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # SPEC §14.3 partial-config extension (owner request): slugs are set but
+    # OPENAI_API_KEY / OPENAI_BASE_URL are blank. The likely first-run state.
+    # A model that cannot be called must not be shown, so the SAME clear
+    # "no model configured" message appears instead of an inline failure on
+    # every send.
+    _env(
+        monkeypatch,
+        OPENAI_MODEL_FAST="fast-real",
+        OPENAI_MODEL_STANDARD="std-real",
+        OPENAI_MODEL_REASONING="reason-real",
     )
-
-    # Manage still works for the owner.
-    at.button(key="nav_manage").click().run()
-    assert not at.exception
-    assert at.radio(key="wa_manage_section").value == "Knowledge"
+    assert list_models() == []  # no key or base URL configured yet
+    _run_no_model_check(monkeypatch, tmp_path)
 
 
 def test_a21_picker_filters_and_falls_back_to_first_configured(
@@ -58,9 +82,12 @@ def test_a21_picker_filters_and_falls_back_to_first_configured(
     monkeypatch.chdir(tmp_path)
     os.environ["HF_HUB_OFFLINE"] = "1"
     # DEFAULT_MODEL_ID is internal-standard; leave ITS slug blank so the picker
-    # must fall back to the first configured model without crashing.
+    # must fall back to the first configured model without crashing. Endpoint
+    # must be configured or no model shows at all (§14.3 partial-config).
     _env(
         monkeypatch,
+        OPENAI_BASE_URL="http://proxy/v1",
+        OPENAI_API_KEY="k",
         OPENAI_MODEL_FAST="fast-real",
         OPENAI_MODEL_STANDARD="",
         OPENAI_MODEL_REASONING="reason-real",
