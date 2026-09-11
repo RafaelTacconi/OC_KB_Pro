@@ -40,13 +40,15 @@ Consequence: `fits_in_context()` keeps using 256k until the real windows are con
 NOTE: this entry was first written by EDITING the entry above in place (a §13.2 violation),
 then restored to append-only form on 2026-09-11. No content was lost.
 
-### OPEN-3 — Does chat history enter the prompt?
+### OPEN-3 — Does chat history enter the prompt? — 2026-09-11
 Question: Do a Chat's prior turns go into the assembled prompt (`SPEC.md` §3.3, §6.5)?
-Outcome: Deferred — not reached.
-Authority: Deferred — not reached.
-Consequence: **The most consequential open item.** Determines whether multiple Chats is a
-context-management feature or a UI organisation feature. Option A (interim) keeps the current
-stateless behaviour; Option B changes the v2 prompt assembly order.
+Outcome: **Option A (interim) applied.** Prior turns in a Chat are NOT sent to the model —
+`build_prompt()` keeps its current signature and assembly order. A Chat is an organisational
+thread only; every turn is answered independently. The chat view shows the §6.5 honesty
+caption ("each question is answered independently… does not remember earlier turns").
+Authority: Agent applied spec interim. NOT answered by project owner.
+Consequence: Switching to Option B (history in the prompt) later touches `build_prompt()`,
+its token budget, and possibly the retrieval query — a contained, spec'd delta (§6.5).
 
 ### OPEN-4 — Membership on a new Workspace
 Question: Who is a member of a newly created Workspace (`SPEC.md` §5.3)?
@@ -69,11 +71,15 @@ Authority: Deferred — not reached.
 Consequence: Without delete, an Owner experimenting with segregation accumulates dead
 Workspaces and their embeddings.
 
-### OPEN-7 — Chat titling
+### OPEN-7 — Chat titling — 2026-09-11
 Question: How is a Chat titled (`SPEC.md` §6.2)?
-Outcome: Deferred — not reached.
-Authority: Deferred — not reached.
-Consequence: A model-generated title costs an extra call; a user-editable title needs UI.
+Outcome: **Interim applied.** On the first user message in a Chat, the title is set to that
+message's text truncated to 60 characters (single line, trailing whitespace stripped, `…`
+appended if truncated) — `_chat_title_from_message()` in `ui/chat_view.py`. Until a message
+arrives (lazy creation) there is no row; the selector shows the empty/new-chat caption.
+Authority: Agent applied spec interim. NOT answered by project owner.
+Consequence: A model-generated summary title would cost an extra call; a user-editable title
+needs UI. Neither is built.
 
 ### OPEN-8 — Chat rename and delete
 Question: Can a Chat be renamed or deleted?
@@ -230,9 +236,10 @@ SPEC §9 lists Step 3 (schema/migration) and Step 4 (multi-Chat UI) as separate 
 from the 2026-09-11 session they ship as one commit. Split up, `_save_message()` would write
 `chat_id = NULL` between the two commits — the exact state A10 forbids, self-healed only by
 the next `migrate_db()` run. Landing migration + the Chat features that use `chat_id`
-atomically means no NULL-chat_id window ever exists. Decision recorded in `state.md`;
-approved by project owner on 2026-09-11. Same one-commit pattern as Step 2b (registry split +
-picker + adapter shipped together).
+atomically means no NULL-chat_id window ever exists. Decision recorded in `state.md`.
+Authority: **Owner delegated the choice on 2026-09-11; the agent chose combined** — the owner
+did not make this call, so this is not an "answered by project owner" entry (A19). Same
+one-commit pattern as Step 2b (registry split + picker + adapter shipped together).
 
 ### 2026-09-11 — Embedding-model load failures are now remembered for the session
 `ingestion/embedding.py::_get_model()` previously only cached a successful load, so every

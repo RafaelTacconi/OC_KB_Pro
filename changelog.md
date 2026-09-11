@@ -7,6 +7,69 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Step 3 + 4 — Schema (chats) + Multi-Chat, landed together
+
+Steps 3 and 4 shipped as ONE commit (owner-delegated decision, agent chose
+combined; `memory.md`). Splitting them would have left `_save_message()`
+writing `chat_id = NULL` between commits — the exact state A10 forbids. Landing
+migration + the Chat features that consume `chat_id` atomically means no
+NULL-chat_id window ever exists.
+
+**Schema and migration changes** (Step 3)
+- `db.py::SCHEMA` — new `chats` table (SPEC §4.2: `chat_id` PK, `workspace_id`,
+  `user_id`, `title`, `created_at`, `updated_at`); `chat_messages` gains
+  `chat_id TEXT REFERENCES chats(chat_id)` (nullable at SQL level, enforced
+  non-null in app code — §4.3).
+- Indexes (SPEC §4.4) moved OUT of `SCHEMA` into a separate `INDEXES` constant,
+  so `migrate_db()` can run them AFTER the legacy-`chat_messages` ALTER
+  (they reference `chat_id`, which a legacy table does not have yet).
+- `db.py::migrate_db()` (SPEC §4.5) — runs SCHEMA first (ensures `chats`
+  exists), adds `chat_id` if absent, backfills one `chats` row titled
+  "Imported conversation" per distinct `(workspace_id, user_id)` with
+  `created_at`/`updated_at` = earliest/latest message, then creates indexes.
+  Idempotent; safe on a fresh DB and on a legacy DB alone.
+- `config.py::bootstrap()` — calls `migrate_db()` immediately after `init_db()`.
+
+**Multi-Chat** (Step 4)
+- `ui/chat_view.py`:
+  - `_load_history(chat_id)` — the old `(workspace_id, user_id)` query is
+    REMOVED (SPEC §6.3, not kept as fallback).
+  - `_save_message()` now takes a required `chat_id` and returns the resolved
+    id. When `chat_id` is None (lazy "+ New chat", §6.2) the `chats` row is
+    created IN THE SAME transaction, chat first (foreign_keys=ON requires the
+    parent before the message → satisfies §7.1 persist-first and item 3).
+  - `_load_user_chats(workspace_id, user_id)` ordered by `updated_at DESC`.
+  - `_render_chat_row()` — chat selector (labelled by title) + "+ New chat"
+    button. `_resolve_active_chat()` validates on every render that `wa_chat_id`
+    belongs to the CURRENT (workspace, user) — a stale id from another user or
+    Workspace is cleared (Step 3/4 item 1, pre-empts Step 5). First visit
+    defaults to the most recent Chat; `wa_chat_id = None` explicitly means
+    "new chat pending".
+  - `chat_id` threaded through `_run_turn` / `_answer` / `_retry`, and into the
+    `wa_pending_error` payload (item 2) so a retry lands in the SAME chat.
+  - `_chat_title_from_message()` (OPEN-7 interim titling, §6.2).
+  - §6.5 honesty caption (Option A — the assistant has no memory).
+- Sidebar user switching is validated against that chat's ownership.
+
+**Tests added**
+- `tests/test_migrate_db.py` — builds a LEGACY DB fixture (old schema, no
+  `chat_id`), seeds 2 users × 2 workspaces; asserts A10 (one chat per
+  (ws,user), no NULL chat_id, correct created/updated, idempotent second run),
+  plus a fresh-DB no-op case.
+- `tests/test_multi_chat.py` — AppTest with stubbed `call_model`: lazy creation +
+  message routing (A7, A8), per-user scoping (A9), workspace scoping (A11), and
+  the §6.5 honesty caption.
+
+**Acceptance criteria satisfied**
+- A7, A8, A9, A10, A11 (new tests). Plus all prior criteria still green.
+
+**Known-broken / deferred**
+- Step 4's "no conversation" empty state shows only for genuinely empty
+  threads; a pending new chat with existing threads shows "Starting a new
+  conversation." — both satisfy §6.2's allowed lazy option.
+
+---
+
 ## 2026-09-11 — Step 2b — Provider configuration and key expiry (SPEC.md §14)
 
 Addendum A, merged as `SPEC.md` §14, implemented. The app can now reach a real
