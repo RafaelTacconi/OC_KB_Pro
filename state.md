@@ -1,65 +1,114 @@
 # state.md — where the work is right now
 
 Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13.3.
-History belongs in `changelog.md`, not here.
+This copy is written for a **human operator** (the project owner) — all build-order
+steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-11 — Step 7 complete.
+**Last updated:** 2026-09-11 — Steps 1–7 complete; Step 8 awaiting owner inputs.
 
 ---
 
-## Current step
+## Where the project stands
 
-**Step 8 — evaluate (blocked on the project owner).** §9.3 offline retrieval
-evaluation via `tests/offline_retrieval_eval.py`. Cannot be started from this
-repo: it needs (1) real documents and (2) a live model endpoint (
-`OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL_*` in `.env`). Until then,
-no further build-order step is implementable.
-
-Everything the spec allows an implementing agent to finish without the owner is
-done. Steps 1–7 are complete; all acceptance criteria through A17 (and A18/A19,
-journal) are green. The remaining owner inputs: real corpora + per-Workspace
-question sets (Step 8), and the still-open `[OPEN]` items (none block Run).
-
-## Progress
-
-| Step | Description | Status |
-|---|---|---|
-| 1 | Unblock the app — fix §7.2 (`break` → `continue` + test) and §7.1 (error handling, message persistence) | **Done** |
-| 2 | Resilience — §7.3 lexical degrade path, §7.4 delete confirmations | **Done** |
-| 2b | Provider config and key expiry — §14: `.env`, adapter, `models/credentials.py`, sidebar warning | **Done** |
-| 3+4 | Schema + multi-Chat (landed together) | **Done** |
-| 5 | Multi-Workspace — selector, create form, membership, branding fix | **Done** |
-| 6 | Visibility — grounding status, model attribution in history | **Done** |
-| 7 | Cleanup — §7.6, §7.7, §7.8 | **Done** |
-| 8 | Evaluate — §9.3 offline retrieval evaluation | Blocked — needs real documents + live endpoint (owner) |
+**Implemented and green (Steps 1–7).** The full test suite passes from a clean
+clone: `git clone` → fresh venv → `pip install -r requirements.txt` →
+`python -m pytest tests/ -q` → **55 passed**. Acceptance matrix for A1–A25 is in
+`ACCEPTANCE_MATRIX.md`. What has never been exercised: a **live model call** and
+**real documents**. The chat loop is real up to the model endpoint, but no `.env`
+is configured in this repo, so every send fails at the model and surfaces the
+§7.1 inline error (intended, tested behaviour).
 
 ## Blocked on
 
-Step 8 (the only remaining step) needs owner input: real documents uploaded per
-Workspace, 10–15 ground-truth questions per topic in `tests/offline_retrieval_eval.py`,
-and a live model endpoint in `.env`. Nothing CODE-wise blocks.
+**OPEN-11 is answered** (OpenAI-compatible proxy, `openai` SDK). **OPEN-12, 3, 4,
+5, 7** have interim behaviour applied (`memory.md` Decision log, Authority: Agent
+applied spec interim). **OPEN-2** is updated-not-closed (context windows still
+256k assumption). What blocks nothing else: Step 8 needs documents + endpoint.
 
-**OPEN-3/4/5/7 interim applied** (`memory.md`). **OPEN-2** updated not closed.
-**OPEN-12** interim implemented. **OPEN-11** answered (OpenAI-compatible proxy).
-Deferred decision resolved: degraded answers are NOT persisted with a marker
-(`memory.md`, agent decision 2026-09-11).
+## Step 8 — what you need to supply, run, and interpret
+
+Two things must exist before anything here works: a configured `.env` and real
+documents. Nothing in this section is runnable without them.
+
+### 0. Configure the model endpoint
+1. `git clone git@github.com:RafaelTacconi/OC_KB_Pro.git`
+2. `cd OC_KB_Pro && python -m venv .venv && .venv\Scripts\pip install -r requirements.txt`
+3. `copy .env.example .env` and fill in:
+   - `OPENAI_BASE_URL=` — the OpenAI-compatible proxy URL
+   - `OPENAI_API_KEY=` — the key
+   - `OPENAI_MODEL_FAST=` / `OPENAI_MODEL_STANDARD=` / `OPENAI_MODEL_REASONING=`
+     — the exact slugs the endpoint expects. **Leave a slug blank to hide that
+     model from the picker.** Blank a slug to confirm OPEN-2's context-window
+     numbers later.
+   - `OPENAI_API_KEY_EXPIRES_ON=` — `YYYY-MM-DD`, optional; a 14-day countdown
+     warning shows to Owners only, `expired` shows red to everyone.
+4. `streamlit run app.py` — sign in as **Alex (Owner)**.
+
+A send should now return a live answer. If it fails: the §7.1 inline error with
+the exception in the expander tells you why (auth, timeout, model slug …). If the
+error says "not recognized"/"deployment not found"-style, STOP — that indicates
+Azure, which is not supported (OPEN-11); the adapter is OpenAI-compatible only.
+
+### 1. Upload real documents per Workspace
+Manage → Knowledge → upload your pdf/docx/xlsx per Workspace and hit
+*Process uploaded files*. Confirm each shows **indexed**. (The first upload
+downloads `all-MiniLM-L6-v2` — needs outbound network to huggingface.co at least
+once.)
+
+### 2. Ground-truth question sets (Step 8 task — the code change is NOT yet made)
+`tests/offline_retrieval_eval.py` currently **hardcodes `DEFAULT_WORKSPACE_ID`**
+and has an empty `QUESTION_SET`. §9.3 required turning the constant into a CLI
+argument. **This change is part of Step 8 and has not been made.** If you want
+the per-Workspace comparison, apply it first:
+
+- edit `if __name__ == "__main__":` in `tests/offline_retrieval_eval.py` to read
+  `sys.argv[1]` as the workspace_id instead of importing the constant.
+- fill `QUESTION_SET` with 10–15 questions per topic, each with
+  `expected_source_substring` = a distinctive part of the source file's
+  display_name.
+
+### 3. Run the §3.2 focus-hypothesis protocol
+1. One **mixed** Workspace containing all documents from all topics.
+2. Three **focused** Workspaces, each containing only its topic's documents.
+3. Run the harness against each: `python -m tests.offline_retrieval_eval <ws_id>`.
+4. Compare top-5 hit rates per question set.
+
+**What the results mean** (SPEC §9.3):
+
+| Result | Conclusion |
+|---|---|
+| Focused runs clearly beat mixed | Segregation helps retrieval; keep it. |
+| Focused ≈ mixed | The benefit of segregation is the Instructions/Tasks effect (§3.2a), not retrieval; still a real reason to segregate. |
+| Focused < mixed | Unexpected; capture the output and reconsider. |
+
+Also while you have a live endpoint: confirm each model's real
+`context_window_tokens` (OPEN-2) and correct `models/registry.py` if 256k is
+wrong — `fits_in_context()` uses it.
+
+## Progress
+
+| Step | Status |
+|---|---|
+| 1 — Unblock app (7.2 break→continue, 7.1 error handling/persistence) | Done |
+| 2 — Resilience (7.3 lexical degrade, 7.4 delete confirms) | Done |
+| 2b — Provider config & key expiry (`.env`, adapter, credentials.py) | Done |
+| 3+4 — Schema (chats) + multi-Chat, landed together | Done |
+| 5 — Multi-Workspace (switch, create, branding, membership) | Done |
+| 6 — Visibility (grounding status, model attribution) | Done |
+| 7 — Cleanup (7.6, 7.7, 7.8) | Done |
+| 8 — Evaluate (§9.3) | **Not started — needs your .env + documents** |
 
 ## Test status
 
 ```
 python -m pytest tests/ -q
-55 passed in 20.95s
+55 passed in 20.92s   (2026-09-11)
 ```
-Run on 2026-09-11 after Step 7. Added `tests/test_chunking_and_prompt.py::test_chunk_boundaries_unchanged_after_dedupe`
-(1, §7.8) and `tests/test_task_vs_freetext.py` (3, §7.6 incl. pending-error
-interaction). No `data/` at the repo root after the suite (conftest).
+Also verified from a **clean clone** (fresh venv, fresh install): 55 passed.
+No `data/` is ever written into the repo root (conftest guard).
 
 ## Next action
 
-Step 7 is done. Hand back to the project owner for Step 8 inputs: (1) copy
-`.env.example` to `.env` and fill in `OPENAI_BASE_URL`, `OPENAI_API_KEY`,
-`OPENAI_MODEL_*` — the app's chat loop is then real; (2) upload real documents
-through Manage → Knowledge per Workspace; (3) write 10–15 questions per topic
-with a known ground-truth source into `tests/offline_retrieval_eval.py`
-(`QUESTION_SET`), then `python -m tests.offline_retrieval_eval <workspace_id>`
-(needs the CLI-arg change from §9.3, not yet made — it is Step 8 itself).
+For the owner: complete the Step 8 inputs above (`.env`, documents, question
+sets, the CLI-arg change), then run the §3.2 protocol. There is no implementation
+work left that an agent can do without you.

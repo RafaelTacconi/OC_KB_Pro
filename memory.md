@@ -233,6 +233,25 @@ manually-changed selection or a create bumps `wa_ws_gen`, making Streamlit treat
 new and re-initialize from `index`. This is the fix for the Step-5 item-2 double-answer trap
 (§5.2.1). The counter is intentional, not cruft — do not "simplify" it into a bare key.
 
+### 2026-09-11 — Clean-clone verification + A24 history check (final sign-off)
+Verified from a fresh `git clone` of `git@github.com:RafaelTacconi/OC_KB_Pro.git`
+into a temp dir: `python -m venv` + `pip install -r requirements.txt` +
+`python -m pytest tests/ -q` → **55 passed** (34s; HF-HUB-ONLINE, embedding model
+downloads occurred in the venv cache). A24 against HISTORY (not the working
+tree): `git log --all --full-history -- .env` → empty; a full-object scan
+(`git rev-list --all --objects`) shows the ONLY `.env*` path ever committed is
+`.env.example` (the empty template). No real key or base URL exists in the repo's
+history. `ACCEPTANCE_MATRIX.md` (repo root) records per-criterion proof for
+A1–A25, including which are not verifiable without a live endpoint / documents.
+
+### 2026-09-11 — A12/A13 caveat (verify against a real failure sometime)
+The §7.1/§7.6 AppTest suites prove the error path against a **monkeypatched
+`call_model` that raises `RuntimeError("forced model failure …")`**, not against
+a real provider failure. The handler is exercise-true, but the real failure
+surface (SDK exception shapes, timeouts mid-stream, auth errors) is unverified.
+When a live endpoint exists, a single manual send against a bad key/slug would
+close this gap; it is not code that needs changing.
+
 ### 2026-09-11 — chunk_text accumulates FRACTIONAL tokens; do not round per paragraph
 `ingestion/chunking.py::chunk_text` accumulates `len(para.split()) * WORDS_TO_TOKENS` as a
 FLOAT across paragraphs and casts once at finalize (`int(current_tokens)`). The §7.8
