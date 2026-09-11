@@ -492,6 +492,16 @@ Sequenced so each step is independently verifiable and nothing is blocked on an 
 
 **Step 2 — resilience.** Fix 7.3 (lexical degrade path) and 7.4 (delete confirmations).
 
+**Step 2b — Provider configuration and key expiry.** `.env.example`, `.gitignore` entry, `python-dotenv`, lazy environment reads, registry/env split, OpenAI-compatible adapter replacing the placeholder, `models/credentials.py`, sidebar warning. (Addendum A — see §14.)
+
+Reasons to do this before Step 3 rather than after Step 7:
+
+- It is the first point at which the application can actually answer a question. Every step so far has been verified against a stub. Steps 4–6 are UI work over the chat surface, and building them blind is worse than building them against a working loop.
+- It validates Step 1's error handling against real failures — timeouts, rate limits, auth errors — rather than a synthetic `RuntimeError`.
+- It touches `models/` and `app.py`'s sidebar. Step 5 also touches `app.py`'s sidebar (the Workspace switcher). Doing both in the same file across two steps is cheaper than reconciling them later.
+
+It depends on nothing in Steps 3–7 and blocks nothing in them.
+
 **Step 3 — schema.** Add `chats`, add `chat_messages.chat_id`, add indexes, write `migrate_db()` and wire it into `bootstrap()`. Verify against both a fresh DB and a copy of an existing one.
 
 **Step 4 — multi-Chat.** `_load_history(chat_id)`, `chat_id` through `_save_message`, `+ New chat`, Chat selector, lazy creation and titling. Option A prompt behaviour (§6.5).
@@ -557,6 +567,15 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A18. `memory.md`, `state.md`, and `changelog.md` exist at the repository root and are current: `state.md` names the correct build-order step and a concrete next action, `changelog.md` has an entry for every completed step, and `memory.md` has a decision-log entry for every `[OPEN]` item encountered.
 - A19. No `[OPEN]` item is recorded in `memory.md` as resolved on the agent's own authority. Permitted outcomes are *interim behaviour applied*, *deferred*, or *answered by project owner on `<date>`*.
 
+**Deployment, credentials, and key expiry** (Addendum A, §14)
+
+- A20. With no `.env` file present, the application starts, the Manage view works, and the chat surface shows a clear "no model configured" message rather than a stack trace.
+- A21. A `ModelSpec` whose env slug is blank does not appear in the model picker. If `DEFAULT_MODEL_ID`'s slug is blank, the picker opens on the first configured model without raising.
+- A22. With `OPENAI_API_KEY_EXPIRES_ON` set 10 days in the future, an Owner sees a persistent orange warning in the sidebar on both the Chat and Manage views, naming the date and the days remaining. Chat, uploads, and every Manage action continue to work unchanged.
+- A23. With the same date set 30 days out, no warning is shown. With it set in the past, all users — Owner and Member — see a red expired notice. With it unset or malformed, `api_key_status()` returns `unknown` and does not raise.
+- A24. `.env` is git-ignored; `.env.example` is committed and contains every variable; no real key or base URL appears anywhere in the repository's history.
+- A25. `call_model()`'s signature is unchanged and `tests/test_chat_error_handling.py` still passes.
+
 ---
 
 ## 11. Open questions
@@ -566,7 +585,7 @@ Consolidated. Each must be answered by the project owner; none should be resolve
 | # | Question | Interim behaviour | Why it matters |
 |---|---|---|---|
 | **OPEN-1** | Where is spec v2? Section references throughout the code are unverifiable without it. | Treat the code's docstrings as the authority. | This document may contradict v2 in ways nobody can currently detect. |
-| **OPEN-2** | Is the `call_model(prompt, model_id)` widening of constraint C4 approved? Are the `provider_model_name` slugs and the 256k context figures in `models/registry.py` correct? | Keep as built; slugs remain flagged as placeholders. | The registry's context-window numbers feed `fits_in_context()`. Wrong numbers mean a wrong guard. |
+| **OPEN-2** | Is the `call_model(prompt, model_id)` widening of constraint C4 approved? Are the `provider_model_name` slugs and the 256k context figures in `models/registry.py` correct? | **Updated, not closed, by Addendum A (§14).** The widening is now confirmed — §14.4 mandates `call_model(prompt, model_id) -> str` stays as the single call site with an unchanged signature, and real slugs / base URL / key are supplied via `.env` (§14.3). What remains open: confirming each model's real `context_window_tokens` against the actual endpoint. | The registry's context-window numbers feed `fits_in_context()`. Wrong numbers mean a wrong guard. |
 | **OPEN-3** | **Does a Chat's prior turns go into the prompt?** (§3.3, §6.5) | Option A — no history in prompt. | Determines whether "multiple Chats" is a context-management feature or a UI organisation feature. Changes the v2 assembly order if Option B. |
 | **OPEN-4** | Who is a member of a newly created Workspace? (§5.3) | All `TEST_USERS`, mirroring the existing seed. | Under the interim rule an Owner cannot create a private Workspace. |
 | **OPEN-5** | Should Workspace names (and Task names) be unique? | Not enforced. | Duplicate names in a selectbox are indistinguishable to the user. |
@@ -575,6 +594,9 @@ Consolidated. Each must be answered by the project owner; none should be resolve
 | **OPEN-8** | Can a Chat be renamed or deleted? | Neither is built. | Same accumulation problem as OPEN-6, at higher volume. |
 | **OPEN-9** | Should any of the accepted limitations in §7.9 be addressed for this PoC? | None addressed. | Several (stopword filtering especially) would change retrieval behaviour and invalidate evaluation runs. |
 | **OPEN-10** | Is there a cross-Workspace question path — e.g. searching several Workspaces at once? | No. Retrieval is strictly single-Workspace. | This is the main functional cost of segregation (§3.1). |
+| **OPEN-11** | Is the endpoint an OpenAI-compatible proxy, Azure OpenAI, or `api.openai.com` directly? (§14.4) | Implement the OpenAI-compatible case. Stop and ask if a real call fails in a way that suggests Azure. | Azure needs a different client class, an `api-version`, and deployment names rather than model slugs. |
+| **OPEN-12** | Who sees the pre-expiry warning? (§14.5) | `expiring`/`unknown` to Owners; `expired` to everyone. | Members cannot renew a key, but they are the ones whose chat breaks when it lapses. |
+| **OPEN-13** | The internally deployed app has no authentication — anyone reaching the port can sign in as Owner and manage or delete any Workspace. Is the host network-restricted, or does the PoC need a gate before deployment? (§14.1) | None. Flagged only. Do not build authentication. | Constraint C6 was written for laptop testing with three users, not for a deployed internal host. |
 
 ---
 
@@ -670,3 +692,151 @@ Append-only, newest entry at the top. One entry per completed build-order step, 
 - Do not let `state.md` accumulate history — that is what `changelog.md` is for. If `state.md` is growing, something is in the wrong file.
 - Do not put project status in `README.md` or `SPEC.md`. Those describe the system; the journal describes the work.
 - Do not treat the journal as a deliverable to write up at the end. Written afterwards from memory, it is worth roughly nothing.
+
+---
+
+## 14. Deployment, credentials, and API key expiry
+
+From Addendum A (`SPEC-addendum-A-provider-and-key-expiry.md`), merged per its top-of-file
+instruction. Tag conventions as per §0.1.
+
+### 14.1 Deployment context `[NEW]`
+
+The application is deployed and used **internally within the company**. It is not publicly accessible.
+
+**What this confirms:** constraint C6 (no authentication, hardcoded `TEST_USERS`) remains acceptable for this PoC. It is not an oversight to be corrected.
+
+**What this does not change:** secrets are still never committed to the repository, never written to the database, and never logged. An internal network is a smaller attack surface, not an absent one.
+
+**What it raises `[OPEN-13]`:** the application has no authentication of any kind. Anyone who can reach the Streamlit port can select "Alex (Owner)" from the sign-in selectbox and thereby upload to, edit, or delete any Workspace, including its knowledge sources. On a laptop with three test users this is harmless. On an internally deployed host it means Workspace management is available to every person on the network who knows the URL. This is a deployment decision for the project owner — whether the host is access-restricted at the network layer, or whether the PoC needs some gate before it is deployed. **Do not build authentication in response to this.** Flag it and continue.
+
+### 14.2 Configuration via `.env` `[NEW]`
+
+Deployment-specific values move out of code and into environment configuration.
+
+**Files:**
+
+- **`.env.example`** — committed to the repository. Contains every variable with an empty or clearly placeholder value and a short comment. This is the file the addendum's "placeholders" requirement refers to.
+- **`.env`** — **never committed.** Add it to `.gitignore` alongside the existing `data/` and `.venv/` entries. The developer copies `.env.example` to `.env` and fills in real values at configuration time.
+
+Committing a real `.env` with placeholder values is not acceptable even though the values are fake: the file then exists in git, someone fills it in locally, and the first `git add -A` commits live credentials. The example-file pattern makes that mistake require deliberate effort.
+
+**Variables:**
+
+```dotenv
+# Base URL of the OpenAI-compatible endpoint.
+OPENAI_BASE_URL=
+
+# API key for the endpoint above.
+OPENAI_API_KEY=
+
+# Date the API key expires, as YYYY-MM-DD (e.g. 2026-12-31).
+# Entered manually by whoever configures the deployment; there is no way to
+# read this from the provider. Leave blank if unknown — the app will run
+# normally and simply will not be able to warn before expiry.
+OPENAI_API_KEY_EXPIRES_ON=
+
+# Model slugs exactly as the endpoint expects them, one per selectable model.
+# Leave a slug blank to hide that model from the picker.
+OPENAI_MODEL_FAST=
+OPENAI_MODEL_STANDARD=
+OPENAI_MODEL_REASONING=
+```
+
+**Loading — there is a trap here.** `models/router.py` currently reads its key at module import:
+
+```python
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "")
+```
+
+That line is evaluated when the module is first imported, which happens via `ui/chat_view.py` during `app.py`'s import block — potentially before any `load_dotenv()` call runs. **Remove it.** Every environment read must happen **lazily, inside the function that needs the value**, never at module scope. In addition, call `load_dotenv()` once at the top of `config.py` (which `app.py` imports early) so the values are present regardless.
+
+Add `python-dotenv` to `requirements.txt`.
+
+The application must start and run normally with no `.env` file present. Absent configuration degrades to a clear, non-crashing message (§14.3, §14.5) — never a stack trace on startup.
+
+### 14.3 How `.env` and `models/registry.py` divide responsibility `[NEW]`
+
+`SPEC.md` §8 rule 7 says model metadata lives in `models/registry.py`. This addendum splits that, and the split is the rule:
+
+| Lives in `.env` | Lives in `models/registry.py` |
+|---|---|
+| Base URL | `model_id` (stable key used in DB rows and session state) |
+| API key | `display_name` shown in the picker |
+| API key expiry date | `notes` shown beside the picker |
+| `provider_model_name` (the slug the endpoint expects) | `context_window_tokens` |
+
+The distinction: **`.env` holds what changes between deployments; the registry holds what the user sees.** A second environment pointing at a different endpoint should need no code change.
+
+**Resolution rules:**
+
+- A `ModelSpec` whose env slug is empty or unset is **omitted from the picker entirely.** Do not show a model that cannot be called.
+- If `DEFAULT_MODEL_ID`'s slug is not configured, fall back to the first configured model. `_render_model_picker()` currently does `[m.model_id for m in models].index(DEFAULT_MODEL_ID)`, which raises `ValueError` if the default is absent — that path must not crash.
+- If **no** model is configured, the picker renders nothing and the chat surface shows a clear message that no model is configured, naming `.env` as the place to fix it. The app stays up; Manage and ingestion continue to work.
+- The `context_window_tokens` value of 256,000 in the registry is **still an assumption** carried from the original note. Once real slugs are known, confirm the real window for each and correct the registry — `fits_in_context()` guards against overflow using that number, so a wrong figure means a wrong guard. This updates, and does not close, `[OPEN-2]`.
+
+### 14.4 Router adapter `[NEW]`
+
+Constraint C4 is unchanged: `call_model(prompt, model_id) -> str` remains the only function that talks to a provider, and **its signature does not change.** `tests/test_chat_error_handling.py` monkeypatches `ui.chat_view.call_model`; that must continue to work.
+
+- Replace the `internal_gateway` provider and `_call_internal_gateway()` placeholder with an OpenAI-compatible adapter. The dispatch structure in `call_model()` stays as it is — one branch per provider.
+- Construct the client **inside** the adapter function, not at module scope (§14.2).
+- **Do not add error handling here.** Let provider exceptions propagate. `_answer()`/`_run_turn()` already catch them and render the inline error with retry (§7.1, shipped in Step 1). A second layer would swallow the detail the expander is meant to show.
+- Do not log the prompt or the API key.
+
+**`[OPEN-11]` — which client?** "OpenAI base URL" is ambiguous between three cases that need different code:
+
+1. **An OpenAI-compatible internal proxy or gateway** — `openai` SDK, `OpenAI(base_url=..., api_key=...)`, model slug passed as `model`. This is the assumption the rest of this section is written against.
+2. **Azure OpenAI** — same SDK but `AzureOpenAI`, requiring an `api-version` and using *deployment names* rather than model names.
+3. **`api.openai.com` directly** — case 1 with the default base URL.
+
+Confirm which before adding an SDK to `requirements.txt`. If the answer is Azure, `.env` needs an additional `OPENAI_API_VERSION` variable and `OPENAI_BASE_URL` becomes the Azure endpoint. **Do not guess** — implement case 1, and if the first real call fails in a way that indicates Azure, stop and ask rather than adapting on the fly.
+
+### 14.5 API key expiry warning `[NEW]`
+
+**Requirement:** starting 14 days before the configured expiry date, the application displays a persistent, clearly visible warning that the API key is approaching expiry and needs renewal. The warning is informational only. It must never block or degrade any functionality.
+
+**Status function.** Add `models/credentials.py` with a single public function:
+
+```python
+api_key_status() -> KeyStatus
+```
+
+returning a frozen dataclass with `state`, `expires_on`, and `days_remaining`, where `state` is one of `"ok"`, `"expiring"`, `"expired"`, `"unknown"`.
+
+- No Streamlit import (`SPEC.md` §8 rule 2). This module computes; `app.py` renders.
+- `KEY_EXPIRY_WARNING_DAYS = 14` is defined here, as a named constant with a comment, not inline in the UI.
+- Date format is `YYYY-MM-DD`, compared against **today's UTC date** (the application uses UTC ISO timestamps throughout — see `_now()` in `config.py`, `db.py` callers, and both view modules).
+- The key is treated as valid **through the end of the named day**. `days_remaining = (expires_on - today_utc).days`; `0` means it expires today and is still usable.
+- `state` resolution: `expired` when `days_remaining < 0`; `expiring` when `0 <= days_remaining <= 14`; `ok` above that; `unknown` when the variable is unset, empty, or unparseable.
+- **`api_key_status()` never raises.** A malformed date returns `unknown`. This function is called on every render; an exception here would take down every page.
+
+**Rendering.** In `app.py`'s sidebar, so it is present on every screen in both the Chat and Manage views, and survives Workspace and Chat switching. Use the existing pill components (`ui/pills.py`) and the existing five-family colour system — do not introduce a new visual treatment:
+
+| State | Shown | Treatment |
+|---|---|---|
+| `expiring` | The expiry date and days remaining, with a short line saying the key needs renewing | `orange` |
+| `expired` | That the key expired on the named date and answers will fail until it is renewed | `red` |
+| `unknown` | That no expiry date is configured, so no advance warning is possible | `gray` |
+| `ok` | Nothing | — |
+
+**Non-interference — these are requirements, not guidance:**
+
+- The warning never disables the model picker, the chat input, the task buttons, uploads, or any Manage action.
+- It is never a modal, never an overlay, never `st.stop()`.
+- It is not re-checked inside `call_model()` or on any model call. It is a display concern evaluated once per render.
+- Expiry itself blocks nothing. When the key has actually expired, calls fail at the provider and §7.1's existing inline error with retry handles it. Do not add a pre-flight check that refuses to call.
+
+**`[OPEN-12]` — who sees the pre-expiry warning?** The brief says "the relevant users" without defining them. A Member cannot renew a key; showing them a countdown for 14 days is noise. But once the key expires, every Member's chat breaks and they need to know why.
+
+**Interim behaviour (implement this):** `expiring` and `unknown` are shown to Owners only. `expired` is shown to **all** users. Flag the question; do not treat the interim as settled.
+
+### 14.6 Explicitly out of scope for this addendum
+
+- Auto-renewal, or any call to the provider to verify key validity. The expiry date is manually entered and manually maintained; that is the whole mechanism.
+- Storing the API key or the expiry date in the database.
+- Displaying the key, or any prefix or suffix of it, anywhere in the UI.
+- Email, Slack, or any out-of-app notification.
+- A second configuration mechanism. `.env` is it — no YAML, no JSON, no `secrets.toml`, no settings UI.
+- Per-Workspace or per-user model credentials. One endpoint, one key, application-wide.
+- Building authentication in response to §14.1.
