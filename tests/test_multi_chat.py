@@ -194,3 +194,48 @@ def test_wa_chat_id_does_not_leak_across_user_switch(
     assert any(
         "No conversations yet" in c.value for c in at.caption
     )
+
+
+def test_new_chat_keeps_selector_and_history_reachable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stubbed_answer
+) -> None:
+    """Owner-reported UX fix: after '+ New chat', the chat selector must NOT
+    disappear while the unsaved new chat is open. The unsaved chat appears as a
+    selectable 'New chat' entry, and switching back to an existing chat (then
+    back to the new one) must work — history is never stranded."""
+    monkeypatch.chdir(tmp_path)
+    at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()
+    assert not at.exception
+    db_path = tmp_path / "data" / "workspace_app.db"
+
+    # Send a message so a real chat exists.
+    at.chat_input[0].set_value(MSG_A1).run()
+    assert not at.exception
+    chats = _chat_counts(db_path)
+    assert len(chats) == 1
+    saved_id = chats[0]["chat_id"]
+
+    def _selector_options(at):
+        # The chat selector key has a generation suffix; find it by label.
+        for sb in at.selectbox:
+            if sb.key and sb.key.startswith("chat_selector_"):
+                return sb
+        return None
+
+    # Click '+ New chat': the selector must STILL be present, offering both
+    # the saved chat AND a 'New chat' entry (unsaved).
+    at.button(key="new_chat_aml-workspace_u_owner").click().run()
+    assert not at.exception
+    sel = _selector_options(at)
+    assert sel is not None, "selector must remain visible while a new chat is open"
+    assert "New chat" in sel.options
+    assert any(o.startswith(MSG_A1[:20]) for o in sel.options)
+
+    # Switching back to the saved chat recovers its history (not a new row).
+    at.selectbox(key=sel.key).set_value(saved_id).run()
+    assert not at.exception
+    assert at.session_state["wa_chat_id"] == saved_id
+    # Chat A's message is still reachable through the history load path.
+    assert MSG_A1 in [m["content"] for m in _messages_for(db_path, saved_id)]
+    # Still only one chat row — switching back did not create another.
+    assert len(_chat_counts(db_path)) == 1

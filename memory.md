@@ -271,6 +271,30 @@ never their semantic content or how much procedure is lost. It is a UX safeguard
 (and an Owner-facing measurement aid), not a guarantee. Do not present it as
 exact.
 
+### 2026-09-11 — Cross-document recall miss: MLRO→SAR filing timeline (Step 8 case)
+A live end-to-end question answered well from three files but STOPPED SHORT on a
+fact that WAS in the corpus: it said the MLRO-to-SAR filing timeline "wasn't in
+the sources", when it is in `AML_Escalation_Procedure.docx` Step 3 — that chunk
+just did not make the top-5 hybrid result for that query (the file has 5
+steps/chunks; other chunks outranked Step 3). This is a concrete, reproducible
+case for the §9.3 offline evaluation: a question whose expected source chunk is
+in the corpus but below the top-5 cutoff. Do NOT change top_k /
+MAX_RETRIEVED_TOKENS to chase it — measure it first. The chunk exists; the
+ranking lost it.
+
+### 2026-09-11 — unstructured PDF section-titles are NOT trustworthy (verified mechanism)
+The citation "AML_Policy.pdf — Financial Crime Oversight Committee" pointed at a
+SENTENCE from inside section 3, not a heading. Cause: `partition_pdf`'s layout
+heuristic classifies visually-emphasized body text as `Title`/`Header` elements,
+and `_group_unstructured_elements` promotes ANY such element to `section_title`.
+Verified on a synthetic DOCX that REAL heading styles produce clean titles, so
+the problem is PDF-specific (the layout model, not the grouping code). Fix would
+be either: (a) for PDF, only trust element types that are genuine headings
+(unstructured still over-labels), or (b) accept `Page N`-style titles from the
+pypdf fallback for PDFs. Not built 2026-09-11; the owner reported it and the real
+AML_Policy.pdf is gone (data/ was cleaned), so no repro file exists. The citation
+section text is a UX trust problem — a wrong "section 3" undermines citations.
+
 ### 2026-09-11 — OPEN-13 was only missing from my summary, not from the spec
 The 12-unanswered count: when listing open items for the owner I gave 11
 (OPEN-1..10 + OPEN-12), omitting **OPEN-13** (the deployed app has no

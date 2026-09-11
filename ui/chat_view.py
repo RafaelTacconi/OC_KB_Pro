@@ -493,35 +493,53 @@ def _render_chat_row(workspace_id: str, user_id: str) -> tuple[str | None, list[
     """
     SPEC §6.2 — the chat selector (ordered by updated_at DESC) + "+ New chat"
     button above the conversation. Returns (active_chat_id, chats_list).
+
+    UX fix (owner-reported): the selector MUST render whenever the user has at
+    least one Chat in this Workspace — including while an unsaved new chat is
+    open (wa_chat_id = None). Lazy creation means the new chat has no row yet,
+    so it is represented by a "__new__" sentinel entry in the selector. This
+    keeps the route back to existing history visible at the exact moment a
+    user is most likely to want it (they just clicked "+ New chat"). Without
+    it, the dropdown vanished and history looked deleted.
+
+    The selector key carries a generation counter (wa_chat_gen): a keyed
+    widget retains its value across reruns, so without it a programmatic
+    switch to "New chat" (or back) would be immediately overridden by the
+    widget's stale selection. Same pattern as the Workspace switcher
+    (memory.md "keyed widget retains its value").
     """
+    NEW_CHAT = "__new_chat__"
     chats = _load_user_chats(workspace_id, user_id)
     active = _resolve_active_chat(workspace_id, user_id, chats)
 
     st.markdown('<div class="wa-eyebrow">Conversation</div>', unsafe_allow_html=True)
 
     col_sel, col_new = st.columns([3, 1], vertical_alignment="center")
-    if chats and active is not None:
+
+    if chats:
+        # Always render the selector when the user has chats.
         chat_labels = {c["chat_id"]: (c["title"] or "New chat") for c in chats}
-        options = [c["chat_id"] for c in chats]
+        labels = {**chat_labels, NEW_CHAT: "New chat"}
+        options = [c["chat_id"] for c in chats] + [NEW_CHAT]
+        current = active if active is not None else NEW_CHAT
+        gen = st.session_state.setdefault("wa_chat_gen", 0)
         with col_sel:
-            current_index = options.index(active)
             chosen = st.selectbox(
                 "Chat",
                 options=options,
-                format_func=lambda cid: chat_labels[cid],
-                index=current_index,
-                key=f"chat_selector_{workspace_id}_{user_id}",
+                format_func=lambda cid: labels[cid],
+                index=options.index(current),
+                key=f"chat_selector_{workspace_id}_{user_id}_{gen}",
             )
-        if chosen != active:
-            st.session_state["wa_chat_id"] = chosen
+        if chosen != current:
+            # Switching between a saved chat and the (unsaved) new chat.
+            st.session_state["wa_chat_id"] = None if chosen == NEW_CHAT else chosen
+            st.session_state["wa_chat_gen"] = gen + 1
             st.rerun()
     else:
         with col_sel:
-            if chats:
-                # Active is None because a new chat is pending.
-                st.caption("Starting a new conversation.")
-            else:
-                st.caption("No conversations yet — answers will start a new thread.")
+            st.caption("No conversations yet — answers will start a new thread.")
+
     with col_new:
         if st.button(
             "+ New chat",
@@ -529,6 +547,7 @@ def _render_chat_row(workspace_id: str, user_id: str) -> tuple[str | None, list[
             use_container_width=True,
         ):
             st.session_state["wa_chat_id"] = None
+            st.session_state["wa_chat_gen"] = st.session_state.get("wa_chat_gen", 0) + 1
             st.session_state.pop(f"selected_task_{workspace_id}", None)
             st.rerun()
     return active, chats
