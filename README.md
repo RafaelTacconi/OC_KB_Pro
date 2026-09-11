@@ -16,7 +16,7 @@ models rather than one hardcoded model.
 
 ```bash
 pip install -r requirements.txt --break-system-packages   # or use a venv
-export INTERNAL_API_KEY=your_key_here
+cp .env.example .env        # fill in OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL_*
 streamlit run app.py
 ```
 
@@ -24,11 +24,14 @@ On first launch, `config.bootstrap()` creates the SQLite schema (WAL mode,
 Section 6.1), seeds the fixed test-user list, and creates one default
 Workspace with two example tasks (`/summarize-policy`, `/find-procedure`).
 
-**Before this talks to a real model:** `models/router.py`'s
-`_call_internal_gateway()` is a placeholder — wire it to your organization's
-actual internal AI API client. `models/registry.py`'s `provider_model_name`
-values are placeholders too; confirm the real model slugs and context-window
-figures against the internal gateway's model list before relying on them.
+**Model endpoint (spec §14 / Step 2b):** `models/router.py::call_model()` is
+a real OpenAI-compatible adapter. It reads `OPENAI_BASE_URL`, `OPENAI_API_KEY`,
+and the `OPENAI_MODEL_*` slugs from `.env` (copied from the committed
+`.env.example`). With no `.env` the app starts and runs, but chat shows a
+clear "no model configured" message until you fill one in; Manage and
+ingestion keep working either way. Those are the only real values that change
+between deployments — everything else the user sees (model names, notes,
+context windows) lives in `models/registry.py`.
 
 ## What's been verified in this sandbox
 
@@ -64,12 +67,11 @@ figures against the internal gateway's model list before relying on them.
   exactly the "do not fail silently" behavior the spec requires (Section
   7.2), and it's a good example of the error path actually firing in practice.
 
-**Not runnable in this sandbox** (needs `INTERNAL_API_KEY` + your organization's
-actual model endpoint, and unrestricted network to huggingface.co for the
-embedding model download): the live chat round-trip through `call_model()`,
-and a real (non-stubbed) `sentence-transformers` embedding pass. Both are
-wired and unit-tested at the logic level; only the actual external calls are
-unverified here.
+**Not runnable in this sandbox** (needs real endpoint values in `.env` and
+unrestricted network to huggingface.co for the embedding model download): the
+live chat round-trip through `call_model()`, and a real (non-stubbed)
+`sentence-transformers` embedding pass. Both are wired and unit-tested at the
+logic level; only the actual external calls are unverified here.
 
 ## Files
 
@@ -115,8 +117,9 @@ tests/
    without evidence from Section 11a that it improves answers. Flagging this
    explicitly so it isn't "fixed" by someone bumping `MAX_RETRIEVED_TOKENS`
    to use more of the window without re-running the offline eval.
-3. **Model slugs and context-window figures in `models/registry.py` are
-   placeholders.** They need to be confirmed against the real internal
-   gateway before this ships to test users — the ~256k figure came from your
-   note, not from an API's model-list response I could query in this
-   sandbox.
+3. **Context-window figures in `models/registry.py` are still unconfirmed.**
+   The 256k figure is carried from the owner's original note; `fits_in_context()`
+   uses it as the safety guard, so confirm each model's real window against the
+   actual endpoint once the `.env` slugs are live (`SPEC.md` §11 OPEN-2,
+   updated not closed). Since Step 2b, the slugs themselves live in `.env`
+   (per-table split in `SPEC.md` §14.3), not in this file.

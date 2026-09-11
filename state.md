@@ -3,18 +3,18 @@
 Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13.3.
 History belongs in `changelog.md`, not here.
 
-**Last updated:** 2026-09-11 — Addendum A merged; Step 2b next.
+**Last updated:** 2026-09-11 — Step 2b complete.
 
 ---
 
 ## Current step
 
-**Step 2b — Provider configuration and key expiry.** New build-order step inserted
-between Steps 2 and 3 by Addendum A (merged into `SPEC.md` §14). `.env.example`,
-`.gitignore` entry, `python-dotenv`, lazy environment reads, registry/env split,
-OpenAI-compatible adapter replacing the placeholder, `models/credentials.py`,
-sidebar warning. **OPEN-11 must be answered by the project owner before the
-adapter is written** — the user has confirmed they will answer it.
+**Step 3 — schema (next).** Add `chats` table (SPEC §4.2), `chat_messages.chat_id`
+(§4.3), the five indexes (§4.4), write `db.migrate_db()` and wire it into
+`config.bootstrap()` immediately after `init_db()` (§4.5). Verify against both a
+fresh DB and a copy of an existing one; `migrate_db()` must be idempotent (run
+twice = no change) and backfill `chat_messages.chat_id` per distinct
+`(workspace_id, user_id)` with one `chats` row titled "Imported conversation".
 
 ## Progress
 
@@ -22,7 +22,7 @@ adapter is written** — the user has confirmed they will answer it.
 |---|---|---|
 | 1 | Unblock the app — fix §7.2 (`break` → `continue` + test) and §7.1 (error handling, message persistence) | **Done** |
 | 2 | Resilience — §7.3 lexical degrade path, §7.4 delete confirmations | **Done** |
-| 2b | Provider config and key expiry — §14: `.env`, adapter, `models/credentials.py`, sidebar warning | Not started |
+| 2b | Provider config and key expiry — §14: `.env`, adapter, `models/credentials.py`, sidebar warning | **Done** |
 | 3 | Schema — `chats` table, `chat_messages.chat_id`, indexes, `migrate_db()` | Not started |
 | 4 | Multi-Chat — history by `chat_id`, new chat, chat selector, titling | Not started |
 | 5 | Multi-Workspace — selector, create form, membership, branding fix | Not started |
@@ -32,32 +32,36 @@ adapter is written** — the user has confirmed they will answer it.
 
 ## Blocked on
 
-**OPEN-11** (which OpenAI-compatible client: proxy / Azure / direct) blocks the
-router adapter at the start of Step 2b. The owner is answering it now. Everything
-else in Step 2b (`.env.example`, `.gitignore`, `python-dotenv`, lazy reads,
-registry/env split, `credentials.py`, sidebar warning) does not depend on it.
+Nothing blocks Step 3. It has no `[OPEN]` dependency.
 
-**OPEN-12** (who sees the pre-expiry warning) has an interim behaviour — implement
-it, do not block. **OPEN-2** is updated, not closed (signature confirmed; context
-windows still need the real endpoint).
+**OPEN-11** is now **answered** (2026-09-11) — OpenAI-compatible proxy, `openai`
+SDK, not Azure; logged in `memory.md`. **OPEN-12** had an interim behaviour
+(implemented). **OPEN-2** is updated, not closed. **OPEN-3** blocks nothing
+before Step 4.
 
-Speaking only `OPEN-3` forward: nothing further blocks until Step 4.
+Pre-existing note: §7.1's "create the `chats` row here too if the Chat is new"
+is deferred to Step 4 — Step 3 creates the `chats` table and the migration, so
+Step 4 can implement it. See `memory.md` deviations.
 
 ## Test status
 
 ```
 python -m pytest tests/ -q
-14 passed in 14.66s
+30 passed in 12.57s
 ```
-Run on 2026-09-11 after completing Step 2. Step 2b is unbuilt so no suite change yet.
+Run on 2026-09-11 after completing Step 2b. Previously 14 passed; Step 2b added
+`tests/test_provider_config.py` (11) and `tests/test_provider_config_app.py` (3),
+plus all prior suites stayed green.
 
 ## Next action
 
-Start Step 2b, in this order: (1) add `.env.example` (committed) and the `.env`
-`.gitignore` entry; (2) add `python-dotenv` to `requirements.txt` and call
-`load_dotenv()` at the top of `config.py`; (3) remove the module-scope
-`INTERNAL_API_KEY = os.environ.get(...)` from `models/router.py` so every env read
-is lazy inside the function; (4) registry/env split in `models/registry.py` +
-picker fallback; (5) `models/credentials.py::api_key_status()` + sidebar warning;
-(6) **the OpenAI-compatible adapter — WAIT for the owner's OPEN-11 answer first.**
-Run `python -m pytest tests/ -q` before and after; A25 must stay green.
+Start Step 3. In `db.py` add the `chats` table to `SCHEMA`, add
+`chat_messages.chat_id TEXT REFERENCES chats(chat_id)`, add the five indexes
+from SPEC §4.4, and write `migrate_db()` performing the §4.5 steps (check
+`PRAGMA table_info(chat_messages)` for `chat_id`, ALTER if absent, backfill one
+`chats` row per distinct `(workspace_id, user_id)` with `chat_id IS NULL`, then
+create the indexes). Wire `migrate_db()` into `config.bootstrap()` right after
+`init_db()`. Verify: fresh empty DB, a DB with legacy messages (backfill
+creates "Imported conversation" chats and no row ends up `chat_id IS NULL`,
+per A10), and running it twice changes nothing. Run `python -m pytest tests/ -q`
+before and after.

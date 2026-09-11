@@ -34,7 +34,12 @@ The failure is `tests/test_spec_v3_regressions.py::test_oversized_chunk_does_not
 
 ## Things you cannot verify here
 
-- `models/router.py::_call_internal_gateway()` is a placeholder that raises `NotImplementedError`. There is no live model endpoint. Every chat turn will fail until it is wired up — which is exactly why `SPEC.md` §7.1 (error handling and message persistence) is step 1.
+- `models/router.py::call_model()` is real but reads its endpoint config
+  (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL_*`) from `.env` — which is
+  not committed here. Copy `.env.example` to `.env` and fill it in to reach a
+  live model; without it every chat turn fails at the model call and surfaces
+  the §7.1 inline error, which is the intended, tested behaviour (SPEC.md §14,
+  Step 2b).
 - The embedding model (`all-MiniLM-L6-v2`) downloads from huggingface.co on first use. If the environment has no network route there, ingestion will fail and write the error to `sources.error_message` — the intended behaviour, not a bug.
 - End-to-end answer quality cannot be assessed without real documents. Do not claim it has been.
 

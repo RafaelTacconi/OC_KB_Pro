@@ -7,6 +7,77 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Step 2b — Provider configuration and key expiry (SPEC.md §14)
+
+Addendum A, merged as `SPEC.md` §14, implemented. The app can now reach a real
+OpenAI-compatible endpoint from `.env` config, wears a dead-simple key-expiry
+warning, and starts cleanly with no config at all.
+
+**Added**
+- `.env.example` — committed, every variable with an empty value + a short
+  comment (base URL, key, expiry date, three model slugs). The file developers
+  copy to `.env`.
+- `models/credentials.py` — `api_key_status() -> KeyStatus` (frozen dataclass:
+  `state` ∈ ok/expiring/expired/unknown, `expires_on`, `days_remaining`).
+  Pure computation, no Streamlit, never raises; `KEY_EXPIRY_WARNING_DAYS = 14`;
+  UTC date arithmetic; valid through the end of the named day (§14.5).
+- `tests/test_provider_config.py` — unit tests for the registry/.env split
+  (§14.3), the expiry status boundaries (A23), and the router's lazy config
+  guard.
+- `tests/test_provider_config_app.py` — AppTest end-to-end for A20 (no .env →
+  "no model configured" warning, Manage still works), A21 (picker filters
+  blank-slug models and falls back from an unconfigured default without
+  raising), A22 (Owner sees the pre-expiry sidebar warning; Member does not,
+  per OPEN-12 interim).
+
+**Modified**
+- `.gitignore` — ignore `.env` (never commit credentials, §14.2).
+- `requirements.txt` — add `python-dotenv>=1.0`, `openai>=1.0`.
+- `config.py` — `load_dotenv()` at import (app.py imports config early), so
+  lazy reads in `models/` see `.env` values regardless of import order (§14.2).
+- `models/router.py` — removed the module-scope
+  `INTERNAL_API_KEY = os.environ.get(...)` and the `internal_gateway`
+  placeholder. `call_model(prompt, model_id) -> str` signature unchanged
+  (A25); dispatches on `provider == "openai_compatible"` to the new
+  `_call_openai_compatible()`, which constructs `OpenAI(base_url, api_key)`
+  INSIDE the call, reads the slug from `.env`, lets provider exceptions
+  propagate to the §7.1 handler, and logs nothing (§14.4). Fails fast with a
+  clear `.env` message before the SDK is imported when unconfigured.
+- `models/registry.py` — `provider_model_name` is no longer a stored field;
+  slugs now come lazily from `.env` via `provider_model_name(model_id)`
+  (`_SLUG_ENV_VARS` maps each model_id → its `OPENAI_MODEL_*` env var).
+  `list_models()` returns only models whose slug is configured (§14.3);
+  `get_model_spec()` unchanged. Provider renamed `internal_gateway` →
+  `openai_compatible`.
+- `ui/chat_view.py` — `_render_model_picker()` returns `None` when no models
+  are configured and shows the "No AI model is configured" warning (A20); falls
+  back from `DEFAULT_MODEL_ID` to the first configured model instead of
+  raising a `ValueError` (A21). Also dropped the `margin-top: 1.6rem`
+  alignment hack on the model note (SP.E.C. §7.8, done early since the line
+  was already being touched; the column uses `vertical_alignment="center"`).
+- `app.py` — sidebar renders the key status via the existing pill components:
+  `expired` (red) to all users, `expiring` (orange) and `unknown` (gray) to
+  Owners only (§14.5, OPEN-12 interim). Informational only; never disables
+  anything.
+
+**Schema and migration changes**
+- None. `db.py` untouched. The `chats` schema work remains Step 3.
+
+**Acceptance criteria satisfied**
+- A20, A21, A22, A23 (via the new tests), A24 (`.env` git-ignored;
+  `.env.example` committed; nothing real in history), A25
+  (`call_model` signature unchanged; `test_chat_error_handling.py` still
+  green — it patches `ui.chat_view.call_model`).
+
+**Known-broken / deferred**
+- No live endpoint values in this repo, so no real model call was made — the
+  adapter is verified fail-fast + wired, but the round-trip needs `.env`
+  filled (AGENTS.md "Environment limits").
+- `context_window_tokens` still 256k assumption (OPEN-2, updated not closed).
+- The `.woff2` font / `static/fonts/README.md` cleanup from §7.8 remains Step 7.
+
+---
+
 ## 2026-09-11 — Step 2 — Resilience (§7.3 + §7.4)
 
 Second implementation step. Chat turns survive an unavailable embedding model

@@ -86,14 +86,15 @@ Outcome: Deferred — not reached.
 Authority: Deferred — not reached.
 Consequence: This is the main functional cost of Workspace segregation (`SPEC.md` §3.1).
 
-### OPEN-11 — Which OpenAI-compatible client?
+### OPEN-11 — Which OpenAI-compatible client? — 2026-09-11
 Question: Is the endpoint an OpenAI-compatible proxy, Azure OpenAI, or `api.openai.com`
 directly (`SPEC.md` §14.4)?
-Outcome: Deferred — not reached.
-Authority: Deferred — not reached.
-Consequence: Azure needs a different client class, an `api-version`, and deployment names
-rather than model slugs. §14.4 says implement the OpenAI-compatible case and stop/ask if a
-real call suggests Azure.
+Outcome: **OpenAI-compatible proxy.** Use the `openai` SDK — `OpenAI(base_url=..., api_key=...)`,
+model slug passed as `model`. Owner confirmed it is not Azure, so no Azure guard and no
+`OPENAI_API_VERSION` variable. Base URL stays empty in `.env.example`; filled in at config time.
+Authority: Answered by project owner on 2026-09-11.
+Consequence: Implement §14.4 case 1 exactly. Adapter replaces `_call_internal_gateway()`;
+`call_model(prompt, model_id) -> str` signature unchanged (A25).
 
 ### OPEN-12 — Who sees the pre-expiry warning?
 Question: The brief says "the relevant users" see the pre-expiry key warning (`SPEC.md` §14.5)
@@ -178,6 +179,15 @@ distinguishing it from a fully-grounded one: the degrade only lives in session s
 way. **Step 6 (visibility) should decide whether to record the degrade on the message** —
 e.g. a marker in the message or a `degraded` column — rather than relying on the
 session-only note. Not built now; the spec (§7.3) requires only the visible note.
+
+### 2026-09-11 — openai SDK v3 API surface (Step 2b)
+The installed `openai` SDK is v3.x. The adapter path is
+`OpenAI(base_url=..., api_key=...)` then `client.chat.completions.create(model=slug, messages=[...])`,
+reading `response.choices[0].message.content`. Base URL and key are only read inside the
+adapter call (lazy, per §14.2); the "unconfigured" guard raises `RuntimeError` BEFORE the SDK
+is imported, so a missing `.env` never triggers a network/import side effect (validated —
+the fail-fast happens pre-`openai` import). The SDK does not fetch anything at `OpenAI(...)`
+construction; errors surface at the `.create()` call.
 
 ---
 

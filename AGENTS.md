@@ -51,9 +51,14 @@ streamlit run app.py                                      # chat will fail until
 
 ## Environment limits
 
-- `models/router.py::_call_internal_gateway()` is a placeholder that raises
-  `NotImplementedError`. There is no live model endpoint. No chat turn can succeed end to end —
-  which is why error handling (`SPEC.md` §7.1) is Step 1.
+- The chat loop is real up to the model endpoint: ingestion, retrieval,
+  prompt assembly, and the §7.1 error handling all work (Steps 1–2, 2b).
+  But `models/router.py` reads `OPENAI_BASE_URL` + `OPENAI_API_KEY` + the
+  `OPENAI_MODEL_*` slugs from `.env` (`SPEC.md` §14), and there is no live
+  endpoint configured in this repo. A chat turn therefore fails at the model
+  call and surfaces the §7.1 inline error — which is the *intended*, tested
+  behaviour, not a bug. Copy `.env.example` to `.env` and fill it in to get a
+  live answer.
 - The embedding model (`all-MiniLM-L6-v2`) downloads from huggingface.co on first use. Without
   that route, ingestion fails and writes the error to `sources.error_message`. That is the
   intended behaviour, not a bug.
