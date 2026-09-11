@@ -103,6 +103,11 @@ def _render_workspace_switcher(current_user: dict) -> str | None:
         current_ws = options[0]
 
     st.markdown('<div class="wa-eyebrow">Workspace</div>', unsafe_allow_html=True)
+    # Generation counter in the widget key: a keyed Streamlit selectbox retains
+    # its previous value across reruns, so a programmatic switch (e.g. a newly
+    # created Workspace) would otherwise fight `index` and silently lose. Bumping
+    # the counter makes the widget re-initialize from `index`. Intentional — see
+    # memory.md "keyed widget ... generation counter"; do not strip it.
     gen = st.session_state.setdefault("wa_ws_gen", 0)
     selected_ws = st.selectbox(
         "Workspace",

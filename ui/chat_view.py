@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from db import transaction
-from models.registry import DEFAULT_MODEL_ID, list_models
+from models.registry import DEFAULT_MODEL_ID, get_model_spec, list_models
 from models.router import call_model
 from prompting.assemble import build_prompt
 from retrieval.hybrid_search import hybrid_search
@@ -58,6 +58,32 @@ def _load_workspace(workspace_id: str) -> dict:
             "SELECT * FROM workspaces WHERE workspace_id = ?", (workspace_id,)
         ).fetchone()
         return dict(row) if row else {}
+    finally:
+        conn.close()
+
+
+def _grounding_summary(workspace_id: str) -> tuple[int, int]:
+    """
+    SPEC §5.2.4 — count of INDEXED Sources and of FAILED Sources for this
+    Workspace. Single count query. Indexed-only matters: counting all rows
+    would tell a Member the Workspace has knowledge when every ingestion
+    failed (Step-6 item 2).
+    """
+    from db import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT
+                SUM(CASE WHEN status = 'indexed' THEN 1 ELSE 0 END) AS indexed,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+            FROM sources
+            WHERE workspace_id = ?
+            """,
+            (workspace_id,),
+        ).fetchone()
+        return (row["indexed"] or 0, row["failed"] or 0)
     finally:
         conn.close()
 
@@ -507,6 +533,20 @@ def _render_chat_row(workspace_id: str, user_id: str) -> tuple[str | None, list[
     return active, chats
 
 
+def _model_display_name(model_id: str) -> str:
+    """
+    SPEC §7.5 — the model that produced an assistant message, for display.
+    Falls back to the raw model_id when the id is no longer in the registry
+    (get_model_spec raises ValueError): since Step 2b a model can vanish from
+    list_models() just by blanking a .env slug, while historical rows keep
+    that id. Showing the raw id preserves provenance rather than hiding it.
+    """
+    try:
+        return get_model_spec(model_id).display_name
+    except ValueError:
+        return model_id
+
+
 def render_chat_view(workspace_id: str, user_id: str) -> None:
     workspace = _load_workspace(workspace_id)
 
@@ -514,6 +554,21 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
         workspace.get("name", workspace_id),
         "Ask anything about the knowledge available in this Workspace.",
     )
+
+    # --- Grounding status (SPEC §5.2.4), all users --------------------------
+    indexed, failed = _grounding_summary(workspace_id)
+    if indexed == 0:
+        st.warning(
+            "This Workspace has no indexed knowledge yet — answers will not be "
+            "grounded in any document. Upload sources from Manage."
+        )
+    else:
+        st.caption(f"{indexed} source{'s' if indexed != 1 else ''} indexed.")
+    # Failed sources -> Owners only (Members don't need the failure detail).
+    from config import TEST_USERS
+    _is_owner = any(u["user_id"] == user_id and u["role"] == "owner" for u in TEST_USERS)
+    if failed and _is_owner:
+        st.caption(f"{failed} source(s) failed to index — see Manage → Knowledge.")
 
     selected_model_id = _render_model_picker(workspace_id)
     if selected_model_id is None:
@@ -554,6 +609,12 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
             st.write(msg["content"])
             if msg["role"] == "assistant" and msg.get("cited_sources"):
                 source_chips(json.loads(msg["cited_sources"]))
+            # SPEC §7.5 — model attribution. Fall back to the raw model_id
+            # when it's no longer in the registry (Step-6 item 1: blanking a
+            # .env slug hides a model from the picker but historical rows
+            # still carry it).
+            if msg["role"] == "assistant" and msg.get("model_id"):
+                st.caption(f"Model: {_model_display_name(msg['model_id'])}")
 
     # --- Pending turn error (SPEC.md §7.1) rendered as the latest bubble ----
     _render_pending_error(workspace_id, user_id, active_chat_id)
