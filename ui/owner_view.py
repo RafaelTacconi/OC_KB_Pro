@@ -111,6 +111,38 @@ def _chunk_count(workspace_id: str) -> int:
         conn.close()
 
 
+def _render_delete_confirmation(item_label: str, kind: str, entity_id: str) -> bool:
+    """
+    SPEC §7.4 — two-step delete confirmation. The first click only sets a
+    session-state flag keyed by the entity id (confirm_delete_{kind}_{id});
+    this renders an explicit "Confirm delete" / "Cancel" pair naming the item.
+    Returns True only when the user clicks Confirm delete during this render;
+    the caller performs the actual deletion and clears the flag. Cancel clears
+    the flag and reruns. The same pattern is used for both Source and Task
+    deletion — one confirmation style, as the spec requires.
+    """
+    st.warning(f"Delete **{item_label}**? This cannot be undone.")
+    col_confirm, col_cancel = st.columns(2)
+    confirmed = False
+    with col_confirm:
+        if st.button(
+            "Confirm delete",
+            key=f"confirm_delete_btn_{kind}_{entity_id}",
+            type="primary",
+            use_container_width=True,
+        ):
+            confirmed = True
+    with col_cancel:
+        if st.button(
+            "Cancel",
+            key=f"cancel_delete_btn_{kind}_{entity_id}",
+            use_container_width=True,
+        ):
+            st.session_state.pop(f"confirm_delete_{kind}_{entity_id}", None)
+            st.rerun()
+    return confirmed
+
+
 # ---------------------------------------------------------------------------------------
 # Knowledge
 # ---------------------------------------------------------------------------------------
@@ -128,16 +160,25 @@ def _render_knowledge_section(workspace_id: str) -> None:
     else:
         with st.container(border=True):
             for i, src in enumerate(sources):
-                cols = st.columns([5, 2, 1], vertical_alignment="center")
-                cols[0].markdown(f"**{src['display_name']}**")
-                with cols[1]:
-                    render_pill(pill(src["status"], SOURCE_STATUS_MAP))
-                    if src["status"] == "failed" and src.get("error_message"):
-                        st.caption(src["error_message"])
-                if cols[2].button("Delete", key=f"delete_{src['source_id']}",
-                                   use_container_width=True):
-                    delete_source(src["source_id"])
-                    st.rerun()
+                flag_key = f"confirm_delete_source_{src['source_id']}"
+                if st.session_state.get(flag_key):
+                    if _render_delete_confirmation(
+                        src["display_name"], "source", src["source_id"]
+                    ):
+                        delete_source(src["source_id"])
+                        st.session_state.pop(flag_key, None)
+                        st.rerun()
+                else:
+                    cols = st.columns([5, 2, 1], vertical_alignment="center")
+                    cols[0].markdown(f"**{src['display_name']}**")
+                    with cols[1]:
+                        render_pill(pill(src["status"], SOURCE_STATUS_MAP))
+                        if src["status"] == "failed" and src.get("error_message"):
+                            st.caption(src["error_message"])
+                    if cols[2].button("Delete", key=f"delete_{src['source_id']}",
+                                       use_container_width=True):
+                        st.session_state[flag_key] = True
+                        st.rerun()
                 if i < len(sources) - 1:
                     st.divider()
 
@@ -246,15 +287,22 @@ def _render_tasks_section(workspace_id: str) -> None:
     tasks = _load_tasks(workspace_id)
 
     for task in tasks:
-        with st.expander(f"{task['name']}  —  {task['description']}"):
+        flag_key = f"confirm_delete_task_{task['task_id']}"
+        with st.expander(
+            f"{task['name']}  —  {task['description']}",
+            key=f"task_expander_{task['task_id']}",
+        ):
             with st.form(key=f"edit_task_{task['task_id']}"):
                 name = st.text_input("Name", value=task["name"])
                 description = st.text_input("Description", value=task["description"])
                 prompt = st.text_area("Prompt (task instructions)", value=task["prompt"], height=150)
                 input_label = st.text_input("Input label", value=task["input_label"])
                 col1, col2 = st.columns(2)
-                save = col1.form_submit_button("Save", type="primary", use_container_width=True)
-                delete = col2.form_submit_button("Delete task", use_container_width=True)
+                save = col1.form_submit_button("Save", type="primary",
+                                               use_container_width=True,
+                                               key=f"save_task_{task['task_id']}")
+                delete = col2.form_submit_button("Delete task", use_container_width=True,
+                                                 key=f"delete_task_{task['task_id']}")
             if save:
                 with transaction() as conn:
                     conn.execute(
@@ -268,9 +316,17 @@ def _render_tasks_section(workspace_id: str) -> None:
                 st.success("Saved.")
                 st.rerun()
             if delete:
-                with transaction() as conn:
-                    conn.execute("DELETE FROM tasks WHERE task_id = ?", (task["task_id"],))
+                # SPEC §7.4 — a form's submit buttons can't host the confirm
+                # step (the form resets on submit), so arming only sets a flag;
+                # the confirm/cancel pair renders outside the form below.
+                st.session_state[flag_key] = True
                 st.rerun()
+            if st.session_state.get(flag_key):
+                if _render_delete_confirmation(task["name"], "task", task["task_id"]):
+                    with transaction() as conn:
+                        conn.execute("DELETE FROM tasks WHERE task_id = ?", (task["task_id"],))
+                    st.session_state.pop(flag_key, None)
+                    st.rerun()
 
     st.markdown("&nbsp;", unsafe_allow_html=True)
     with st.expander("+ New task"):

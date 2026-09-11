@@ -13,6 +13,10 @@ Usage:
     3. Read the printed table. If hybrid underperforms lexical-only on more
        than a couple of questions, revisit the embedding strategy
        (Section 8.2a) before running the user-facing comparison (Section 11).
+
+The harness refuses to run while semantic retrieval is unavailable: it does
+NOT silently degrade to lexical-only results, because comparing identical
+rows would falsely suggest hybrid adds nothing (SPEC.md §7.3).
 """
 
 from __future__ import annotations
@@ -51,7 +55,15 @@ def run_eval(workspace_id: str) -> None:
 
         lex = lexical_search(q, workspace_id, top_k=TOP_K)
         sem = semantic_search(q, workspace_id, top_k=TOP_K)
-        hyb = hybrid_search(q, workspace_id, top_k=TOP_K)
+        hyb, degraded = hybrid_search(q, workspace_id, top_k=TOP_K)
+        if degraded:
+            raise RuntimeError(
+                "Semantic retrieval is unavailable (the embedding model did not "
+                "load). The evaluation harness refuses to compare lexical-only "
+                "hybrid results — a silent fallback would make hybrid and "
+                "lexical-only produce identical rows and could falsely suggest "
+                "hybrid adds nothing (SPEC.md §7.3 / §9.3)."
+            )
 
         rows.append(
             {

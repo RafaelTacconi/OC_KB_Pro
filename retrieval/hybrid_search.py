@@ -104,9 +104,17 @@ def hybrid_search(
     top_k: int = 5,
     rrf_k: int = 60,
     candidate_pool: int = 10,
-) -> list[dict]:
+) -> tuple[list[dict], bool]:
     """
     Merges lexical + semantic results via Reciprocal Rank Fusion.
+
+    Returns (chunks, degraded): `chunks` is the merged top-k list; `degraded`
+    is True when semantic_search was unavailable and the results are
+    lexical-only (SPEC §7.3). On degrade the caller must surface a visible
+    note that semantic retrieval is unavailable — this signal is the specified
+    exception-free way to do that without importing Streamlit into retrieval/.
+    If lexical_search ALSO fails, that exception propagates unchanged (it is
+    not part of the degrade path — see §7.3).
 
     rrf_k=60 and candidate_pool=10 are exposed as parameters (not inline
     magic numbers) specifically so they can be tuned during the Section 11a
@@ -117,7 +125,13 @@ def hybrid_search(
     broader literature (Section 16.4).
     """
     lexical = lexical_search(question, workspace_id, top_k=candidate_pool)
-    semantic = semantic_search(question, workspace_id, top_k=candidate_pool)
+    try:
+        semantic = semantic_search(question, workspace_id, top_k=candidate_pool)
+    except Exception:  # noqa: BLE001 - degrade, see §7.3
+        semantic = []
+        degraded = True
+    else:
+        degraded = False
 
     scores: dict[str, dict] = {}
     for rank, chunk in enumerate(lexical):
@@ -128,4 +142,4 @@ def hybrid_search(
         entry["score"] += 1 / (rrf_k + rank)
 
     ranked = sorted(scores.values(), key=lambda x: x["score"], reverse=True)
-    return [r["chunk"] for r in ranked[:top_k]]
+    return [r["chunk"] for r in ranked[:top_k]], degraded

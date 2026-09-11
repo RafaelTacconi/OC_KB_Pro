@@ -126,17 +126,22 @@ def _run_turn(
     user_input: str,
     model_id: str,
     task: dict | None = None,
-) -> None:
+) -> bool:
     """
     Retrieval + prompt assembly + model call + assistant-message persistence.
     Deliberately free of Streamlit (SPEC.md §7.1) so the caller owns the
     spinner and this can run from the Retry path too. Raises on any failure —
     nothing is persisted for the assistant unless this returns normally.
+
+    Returns True when the turn ran with degraded retrieval — semantic search
+    was unavailable and the answer is grounded in lexical (keyword) results
+    only (SPEC.md §7.3); the caller surfaces the visible note. Returns False
+    when both lexical and semantic retrieval were available.
     """
     workspace = _load_workspace(workspace_id)
 
     retrieval_query = user_input if not task else f"{task['name']} {user_input}"
-    chunks = hybrid_search(retrieval_query, workspace_id, top_k=5)
+    chunks, degraded = hybrid_search(retrieval_query, workspace_id, top_k=5)
 
     prompt = build_prompt(
         workspace_instructions=workspace.get("instructions", ""),
@@ -165,6 +170,7 @@ def _run_turn(
         task_id=task["task_id"] if task else None,
         model_id=model_id,
     )
+    return degraded
 
 
 def _stash_error(workspace_id: str, user_id: str, user_input: str,
@@ -199,8 +205,11 @@ def _answer(
          and rendered as an inline assistant bubble with a Retry control after
          the rerun — it never reaches Streamlit's error screen, and no
          assistant message is persisted.
+      4. A successful turn that had to degrade to lexical-only retrieval (§7.3)
+         sets wa_semantic_degraded so the chat view shows a visible note.
     """
     _clear_pending_error()
+    st.session_state.pop("wa_semantic_degraded", None)
     _save_message(
         workspace_id, user_id, "user", user_input,
         task_id=task["task_id"] if task else None,
@@ -208,9 +217,12 @@ def _answer(
 
     try:
         with st.spinner("Thinking..."):
-            _run_turn(workspace_id, user_id, user_input, model_id, task=task)
+            degraded = _run_turn(workspace_id, user_id, user_input, model_id, task=task)
     except Exception as exc:  # noqa: BLE001 - see §7.1
         _stash_error(workspace_id, user_id, user_input, model_id, task, exc)
+        return
+    if degraded:
+        st.session_state["wa_semantic_degraded"] = True
 
 
 def _retry() -> None:
@@ -220,9 +232,10 @@ def _retry() -> None:
     if not payload:
         return
     _clear_pending_error()
+    st.session_state.pop("wa_semantic_degraded", None)
     try:
         with st.spinner("Thinking..."):
-            _run_turn(
+            degraded = _run_turn(
                 payload["workspace_id"],
                 payload["user_id"],
                 payload["user_input"],
@@ -235,6 +248,10 @@ def _retry() -> None:
             payload["user_input"], payload["model_id"],
             payload.get("task"), exc,
         )
+        st.rerun()
+        return
+    if degraded:
+        st.session_state["wa_semantic_degraded"] = True
     st.rerun()
 
 
@@ -343,6 +360,14 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
 
     # --- Pending turn error (SPEC.md §7.1) rendered as the latest bubble ----
     _render_pending_error(workspace_id, user_id)
+
+    # --- Semantic-retrieval degrade note (SPEC.md §7.3 / A15) ---------------
+    if st.session_state.get("wa_semantic_degraded"):
+        st.warning(
+            "Semantic retrieval is unavailable in this session — the answer "
+            "below is based on lexical (keyword) search only, so results may "
+            "be less complete."
+        )
 
     # --- Predefined tasks (constraint 7: no live "/" autocomplete) ----------
     tasks = _load_tasks(workspace_id)

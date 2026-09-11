@@ -18,14 +18,34 @@ import numpy as np
 
 _MODEL_NAME = "all-MiniLM-L6-v2"
 _model = None  # lazy singleton — loading is not free, avoid reloading per call
+_model_load_error: Exception | None = None  # remembered load failure, see _get_model
 
 
 def _get_model():
-    global _model
-    if _model is None:
+    """
+    Load the model once and cache the result for the process lifetime.
+
+    A FAILED load is remembered too (SPEC.md §7.3 interplay): once the model
+    fails to load, every subsequent call raises the same failure fast instead
+    of re-attempting the network/model download on every chat turn. This is a
+    deliberate deviation from the earlier behaviour (retry every call) — see
+    the "Deviations from the spec" section of memory.md. To recover, restart
+    the app once the model/network is working.
+    """
+    global _model, _model_load_error
+    if _model is None and _model_load_error is None:
         from sentence_transformers import SentenceTransformer
 
-        _model = SentenceTransformer(_MODEL_NAME)
+        try:
+            _model = SentenceTransformer(_MODEL_NAME)
+        except Exception as exc:  # noqa: BLE001 - remember any load failure
+            _model_load_error = exc
+    if _model_load_error is not None:
+        raise RuntimeError(
+            "The embedding model failed to load earlier in this session, so "
+            "semantic retrieval is unavailable until the app is restarted with "
+            "a working model/network."
+        ) from _model_load_error
     return _model
 
 
