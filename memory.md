@@ -252,6 +252,25 @@ surface (SDK exception shapes, timeouts mid-stream, auth errors) is unverified.
 When a live endpoint exists, a single manual send against a bad key/slug would
 close this gap; it is not code that needs changing.
 
+### 2026-09-11 — OCR is scoped-and-deferred (out of scope for the PoC) — SPEC §15.1
+Reading embedded image content (OCR / image extraction) is DECIDED out of scope
+for this PoC. Reasons recorded: (1) native Tesseract + poppler binaries are
+required on Windows and are not pip-installable (the same system-dependency
+chain the repo's docstrings flag as fragile); (2) OCR is minutes-per-file vs
+milliseconds for text — prohibitive for an image-heavy corpus; (3) citations
+would be file-level only (no figure/region linkage); (4) DOCX image reading
+needs a vision model, not just OCR. Instead, the app counts embedded images per
+file and shows an Owner note (§15.1) so the gap is visible without attempting to
+read the images. Authority: owner decision 2026-09-11; do not reintroduce OCR.
+
+### 2026-09-11 — Embedded-image count is a FLOOR, not an exact measure — SPEC §15.1
+The per-file `image_count` (parsers + `sources.image_count`) counts raster
+images only. Vector diagrams and curve-rendered text may not register as
+countable images, so the count is a lower bound. It flags the PRESENCE of images,
+never their semantic content or how much procedure is lost. It is a UX safeguard
+(and an Owner-facing measurement aid), not a guarantee. Do not present it as
+exact.
+
 ### 2026-09-11 — OPEN-13 was only missing from my summary, not from the spec
 The 12-unanswered count: when listing open items for the owner I gave 11
 (OPEN-1..10 + OPEN-12), omitting **OPEN-13** (the deployed app has no

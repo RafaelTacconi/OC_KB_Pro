@@ -4,19 +4,20 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-11 — Steps 1–7 complete; Step 8 awaiting owner inputs.
+**Last updated:** 2026-09-11 — Steps 1–7 + §15 complete; Step 8 awaiting owner inputs.
 
 ---
 
 ## Where the project stands
 
-**Implemented and green (Steps 1–7).** The full test suite passes from a clean
-clone: `git clone` → fresh venv → `pip install -r requirements.txt` →
-`python -m pytest tests/ -q` → **55 passed**. Acceptance matrix for A1–A25 is in
-`ACCEPTANCE_MATRIX.md`. What has never been exercised: a **live model call** and
-**real documents**. The chat loop is real up to the model endpoint, but no `.env`
-is configured in this repo, so every send fails at the model and surfaces the
-§7.1 inline error (intended, tested behaviour).
+**Implemented and green (Steps 1–7 + SPEC §15).** The full test suite passes from a
+clean clone: `git clone` → fresh venv → `pip install -r requirements.txt` →
+`python -m pytest tests/ -q` → **61 passed**. Acceptance matrix for A1–A25 is in
+`ACCEPTANCE_MATRIX.md`. §15 added A26–A28 (embedded-image visibility + no-model
+send block). What has never been exercised: a **live model call** and **real
+documents**. A `.env` is configured in this repo (OpenRouter-compatible endpoint
+with 2 model slugs), so the app boots with a working model picker, but no real
+document has been ingested and no live model answer has been produced.
 
 ## Blocked on
 
@@ -96,20 +97,28 @@ wrong — `fits_in_context()` uses it.
 | 5 — Multi-Workspace (switch, create, branding, membership) | Done |
 | 6 — Visibility (grounding status, model attribution) | Done |
 | 7 — Cleanup (7.6, 7.7, 7.8) | Done |
-| 8 — Evaluate (§9.3) | **Not started — needs your .env + documents** |
+| §15 — Image visibility + no-model send block | Done |
+| 8 — Evaluate (§9.3) | **Not started — needs your documents + live model call** |
 
 ## Test status
 
 ```
 python -m pytest tests/ -q
-56 passed in 22.59s   (2026-09-11)
+61 passed in 35.86s   (2026-09-11)
 ```
-Also verified from a **clean clone** (fresh venv, fresh install): 55 passed at
-`a9d033c`; the +1 (A3 behavioural test) landed after. No `data/` is ever written
-into the repo root (conftest guard).
+Verified from a **clean clone** earlier (fresh venv, fresh install): 55 passed at
+`a9d033c`; the later A3/§15 additions brought it to 61. No `data/` is ever written
+into the repo root by the suite (conftest guard). NOTE: the suite must run from a
+cwd with no `.env` (tests blank the model vars themselves), so a stray `data/`
+from a manually-launched app must be removed before `pytest` or the conftest
+guard trips.
 
 ## Next action
 
-For the owner: complete the Step 8 inputs above (`.env`, documents, question
-sets, the CLI-arg change), then run the §3.2 protocol. There is no implementation
-work left that an agent can do without you.
+For the owner: complete the Step 8 inputs (documents per Workspace, ground-truth
+question sets, the `offline_retrieval_eval.py` CLI-arg change), then run the §3.2
+protocol. `.env` is configured (2 model slugs), so the chat loop can be exercised
+now. Before test users: use the §15.1 Manage → Knowledge image note to size how
+much of the image-heavy corpus is image-only and unindexed (the earlier
+`scripts/image_audit.py` idea was superseded by the in-app warning). There is no
+implementation work left that an agent can do without you.

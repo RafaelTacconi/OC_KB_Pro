@@ -7,6 +7,52 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — §15 work: embedded-image visibility + no-model send block
+
+New work beyond the §14 addendum, per SPEC.md §15 (added 2026-09-11). Two
+owner-requested behaviours.
+
+**Added**
+- `ingestion/parsers.py::count_embedded_images(file_path, source_type)` — counts
+  embedded raster images in a PDF/DOCX using only installed deps (unstructured
+  element stream, pypdf XObject scan fallback for PDF; python-docx
+  inline_shapes fallback for DOCX). Returns 0 for XLSX and never raises. The
+  count is a documented FLOOR (vector/curve-rendered content may not register).
+- `ingestion/pipeline.py` — computes `image_count` during `ingest_source` and
+  writes it on the `sources` row when indexed.
+- `ui/owner_view.py` — Manage → Knowledge shows, per Source with
+  `image_count > 0`, a caption "N images — their content is not indexed".
+- `db.py` — `sources.image_count INTEGER` (nullable) in SCHEMA, and
+  `migrate_db()` ALTER-adds it for legacy DBs (SPEC §4.5 pattern).
+- `ui/chat_view.py` — A20 (option 1): when no model is configured, the chat
+  `st.chat_input` and task buttons are DISABLED (not hidden); the existing
+  "No AI model is configured" warning is the single explanation and no send can
+  fail with `Unknown model_id None`.
+- `tests/test_image_count.py` (5) — A26/A27: PDF/DOCX counting, floor/never-
+  raises, migration adds the column, and the Owner note renders in Manage.
+
+**Modified**
+- `tests/test_provider_config_app.py` — no-env tests now blank ALL OPENAI_* vars
+  (a real `.env` on disk used to leak into AppTest since it runs with cwd=repo);
+  added disabled assertions for the A20 block.
+- `SPEC.md` — §15 added (image visibility + no-model send block), acceptance
+  criteria A26–A28 added to §10 (no renumbering).
+- `memory.md` — OCR scoped-and-deferred (reasons recorded); image count is a
+  floor.
+
+**Schema and migration changes**
+- `sources` gains `image_count INTEGER` (nullable). `migrate_db()` adds it to
+  legacy DBs. No other schema change.
+
+**Acceptance criteria satisfied**
+- A26, A27, A28. (A20's send block tightened.) All prior criteria still green.
+
+**Known-broken / deferred**
+- OCR is out of scope (memory.md). Image count is a floor, not exact. The A20
+  block only hides/disables sends; it does not itself validate config.
+
+---
+
 ## 2026-09-11 — Post-Step-7 follow-ups (acceptance matrix completeness)
 
 No build-order step; corrections/tightening after the final sign-off.
