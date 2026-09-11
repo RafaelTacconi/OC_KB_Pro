@@ -8,21 +8,42 @@ constraint's intent — one thin abstraction, no provider SDK calls scattered
 through the app — by keeping a single call_model() entry point (models/router.py)
 that dispatches on `model_id` using the metadata defined here.
 
+SPEC §14.3 splits responsibility between this file and .env:
+
+  | Lives in .env                    | Lives in models/registry.py       |
+  | Base URL                         | model_id (stable DB/UI key)       |
+  | API key                          | display_name (shown in picker)    |
+  | API key expiry date              | notes (shown beside the picker)   |
+  | provider_model_name (endpoint    | context_window_tokens             |
+  |   slug)                          |                                   |
+
+The distinction: .env holds what changes between deployments; this registry
+holds what the user sees. `provider_model_name(model_id)` reads the slug
+lazily from .env — a ModelSpec whose slug env var is empty is OMITTED from
+list_models() (SPEC §14.3): never show a model that cannot be called.
+
 Each entry's `context_window_tokens` reflects the ~256k figure the internal
 gateway reports for these models. This number matters directly for Section 9.2:
 MAX_RETRIEVED_TOKENS (a fixed 3000-token retrieval budget) is far below any of
 these windows, so the ceiling in the spec is a deliberate, conservative
 generation-quality choice (keep the model focused on a handful of chunks, not
 "use the whole window because it's available") — not a hardware limit. See
-models/context_budget.py for how the two interact.
-
-Update this file, not scattered constants elsewhere, when the internal
-gateway adds/removes a model or changes its context window.
+models/context_budget.py for how the two interact. The 256k figure is STILL an
+assumption (OPEN-2, updated not closed) — confirm against the real endpoint
+when slugs are live.
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+
+# model_id -> .env variable holding that model's endpoint slug (SPEC §14.3).
+_SLUG_ENV_VARS = {
+    "internal-fast": "OPENAI_MODEL_FAST",
+    "internal-standard": "OPENAI_MODEL_STANDARD",
+    "internal-reasoning": "OPENAI_MODEL_REASONING",
+}
 
 
 @dataclass(frozen=True)
@@ -30,38 +51,32 @@ class ModelSpec:
     model_id: str            # stable key used in DB rows and UI state
     display_name: str        # shown in the model picker
     provider: str            # dispatch key for models/router.py adapters
-    provider_model_name: str  # the exact string the provider's API expects
     context_window_tokens: int
     notes: str = ""
 
 
-# NOTE: provider_model_name values are illustrative placeholders for the
-# internal gateway's current model slugs. Confirm exact strings against the
-# internal API's model list before wiring this to a live endpoint — do not
-# assume these are correct without checking (see build order note in
-# ui/model_picker.py).
+# provider slugs come from .env, not from here (SPEC §14.3). Do not reintroduce
+# hardcoded slugs: OPEN-2 is updated, not closed, and .env is the one place the
+# deployment-owner edits model wiring.
 AVAILABLE_MODELS: list[ModelSpec] = [
     ModelSpec(
         model_id="internal-fast",
         display_name="Fast (low latency)",
-        provider="internal_gateway",
-        provider_model_name="internal-fast-v1",
+        provider="openai_compatible",
         context_window_tokens=256_000,
         notes="Best default for short factual questions and most / tasks.",
     ),
     ModelSpec(
         model_id="internal-standard",
         display_name="Standard",
-        provider="internal_gateway",
-        provider_model_name="internal-standard-v1",
+        provider="openai_compatible",
         context_window_tokens=256_000,
         notes="Balanced default; recommended starting choice.",
     ),
     ModelSpec(
         model_id="internal-reasoning",
         display_name="Reasoning (slower, more thorough)",
-        provider="internal_gateway",
-        provider_model_name="internal-reasoning-v1",
+        provider="openai_compatible",
         context_window_tokens=256_000,
         notes="Use for multi-step analysis tasks, e.g. /analyze-case.",
     ),
@@ -81,5 +96,22 @@ def get_model_spec(model_id: str) -> ModelSpec:
         ) from exc
 
 
+def provider_model_name(model_id: str) -> str:
+    """
+    The exact slug the endpoint expects for `model_id`, read LAZILY from
+    .env (SPEC §14.2 — never module scope). Returns "" when unset/blank.
+    """
+    var = _SLUG_ENV_VARS.get(model_id, "")
+    if not var:
+        return ""
+    return os.environ.get(var, "").strip()
+
+
 def list_models() -> list[ModelSpec]:
-    return list(AVAILABLE_MODELS)
+    """
+    Only models whose .env slug is configured (SPEC §14.3 resolution rules).
+    A ModelSpec whose slug env var is empty is omitted — never show a model
+    that cannot be called. If the default's slug is unconfigured, callers
+    must fall back to the first configured model (see ui/chat_view.py).
+    """
+    return [m for m in AVAILABLE_MODELS if provider_model_name(m.model_id)]

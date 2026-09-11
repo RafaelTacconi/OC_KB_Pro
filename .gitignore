@@ -10,6 +10,9 @@ venv/
 # Runtime data (SQLite DB + uploaded sources) — created on first run
 data/
 
+# Deployment configuration with real credentials — never committed (SPEC §14.2)
+.env
+
 # OS
 .DS_Store
 Thumbs.db

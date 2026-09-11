@@ -276,10 +276,21 @@ def _render_pending_error(workspace_id: str, user_id: str) -> None:
             _retry()
 
 
-def _render_model_picker(workspace_id: str) -> str:
+def _render_model_picker(workspace_id: str) -> str | None:
+    """
+    SPEC §14.3. list_models() already omits models whose .env slug is blank.
+    Returns None when no model is configured (caller shows the no-model
+    message); otherwise falls back from DEFAULT_MODEL_ID to the first
+    configured model when the default's slug is unset (never crashes).
+    """
     models = list_models()
+    if not models:
+        return None
     model_labels = {m.model_id: m.display_name for m in models}
-    default_index = [m.model_id for m in models].index(DEFAULT_MODEL_ID)
+    try:
+        default_index = [m.model_id for m in models].index(DEFAULT_MODEL_ID)
+    except ValueError:
+        default_index = 0
 
     col_picker, col_note = st.columns([2, 3], vertical_alignment="center")
     with col_picker:
@@ -293,7 +304,7 @@ def _render_model_picker(workspace_id: str) -> str:
     spec = next(m for m in models if m.model_id == selected_model_id)
     with col_note:
         st.markdown(
-            f'<div style="opacity:0.6; font-size:0.82rem; margin-top: 1.6rem;">{spec.notes}</div>',
+            f'<div style="opacity:0.6; font-size:0.82rem;">{spec.notes}</div>',
             unsafe_allow_html=True,
         )
     return selected_model_id
@@ -342,6 +353,15 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
     )
 
     selected_model_id = _render_model_picker(workspace_id)
+    if selected_model_id is None:
+        # SPEC §14.3: no model configured in .env. App stays up; Manage and
+        # ingestion continue to work (A20). The chat input stays visible but
+        # any send fails gracefully via the §7.1 handler.
+        st.warning(
+            "No AI model is configured. Copy `.env.example` to `.env` and set "
+            "`OPENAI_BASE_URL`, `OPENAI_API_KEY`, and at least one "
+            "`OPENAI_MODEL_*` slug, then restart the app."
+        )
     st.divider()
 
     # --- History ------------------------------------------------------------

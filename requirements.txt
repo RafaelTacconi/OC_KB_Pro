@@ -4,6 +4,8 @@ openpyxl>=3.1
 tabulate>=0.9        # required by pandas.DataFrame.to_markdown()
 sentence-transformers>=3.0
 numpy>=1.26
+python-dotenv>=1.0
+openai>=1.0
 
 # PDF/DOCX parsing — primary (layout-aware). Confirm this installs cleanly
 # on the target host EARLY (spec Section 14, build-order step 2). If it

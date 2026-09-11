@@ -9,18 +9,23 @@ Since the app now supports multiple selectable models, that one-function
 promise is kept as: exactly one function (`call_model`) that every caller
 uses, dispatching internally by provider. If every available model in
 models/registry.py happens to share one provider (as they do here — all
-routed through one internal gateway), there is exactly one branch. Adding
-a second provider later means adding one adapter function here, never
+routed through one OpenAI-compatible endpoint), there is exactly one branch.
+Adding a second provider later means adding one adapter function here, never
 touching callers in retrieval/prompt-assembly/UI code.
+
+SPEC §14.2: all environment reads are lazy, inside the function that needs
+the value — never at module scope. There is deliberately no module-scope
+`os.environ.get(...)` here anymore.
 """
 
 from __future__ import annotations
 
 import os
 
-from models.registry import get_model_spec
+from models.registry import get_model_spec, provider_model_name
 
-INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "")
+OPENAI_BASE_URL_ENV = "OPENAI_BASE_URL"
+OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 
 
 def call_model(prompt: str, model_id: str) -> str:
@@ -32,36 +37,47 @@ def call_model(prompt: str, model_id: str) -> str:
         prompt: the fully-assembled prompt (see prompting/assemble.py).
         model_id: key into models/registry.AVAILABLE_MODELS, typically
                   whatever the user selected in the model picker.
+
+    Signature is unchanged (SPEC §14.4 / A25). Provider exceptions propagate
+    to the §7.1 handler — do NOT add error handling here.
     """
     spec = get_model_spec(model_id)
 
-    if spec.provider == "internal_gateway":
-        return _call_internal_gateway(prompt, spec.provider_model_name)
+    if spec.provider == "openai_compatible":
+        return _call_openai_compatible(prompt, model_id)
 
     raise ValueError(f"No adapter implemented for provider {spec.provider!r}")
 
 
-def _call_internal_gateway(prompt: str, provider_model_name: str) -> str:
+def _call_openai_compatible(prompt: str, model_id: str) -> str:
     """
-    Adapter for the organization's internal AI-model API.
-    Replace the body with the actual internal client call; the interface
-    (prompt in, text out) should not need to change for callers.
+    Adapter for an OpenAI-compatible endpoint (SPEC §14.4, OPEN-11: a proxy
+    / gateway, not Azure).
+
+    The client is constructed inside this function so credentials are read
+    lazily and no SDK call is ever made at import time. The model slug comes
+    from .env via registry.provider_model_name (the registry holds what the
+    user sees; .env holds what the endpoint expects).
+
+    No error handling here on purpose — provider exceptions propagate to the
+    §7.1 inline-error-with-retry. Nothing is logged (no prompt, no key).
     """
-    if not INTERNAL_API_KEY:
+    from openai import OpenAI
+
+    base_url = os.environ.get(OPENAI_BASE_URL_ENV, "").strip()
+    api_key = os.environ.get(OPENAI_API_KEY_ENV, "").strip()
+    model = provider_model_name(model_id)
+
+    if not base_url or not api_key or not model:
         raise RuntimeError(
-            "INTERNAL_API_KEY is not set. Load it from environment/secrets — "
-            "never hardcode it (spec Section 9.3)."
+            "Model endpoint is not configured. Copy `.env.example` to `.env` "
+            "and set OPENAI_BASE_URL, OPENAI_API_KEY, and the "
+            f"OPENAI_MODEL_* slug for {model_id!r} — see SPEC.md §14.2."
         )
 
-    # --- Placeholder call shape; swap for the real internal SDK/HTTP call. ---
-    # import internal_ai_client
-    # response = internal_ai_client.generate(
-    #     api_key=INTERNAL_API_KEY,
-    #     model=provider_model_name,
-    #     prompt=prompt,
-    # )
-    # return response.text
-    raise NotImplementedError(
-        "Wire _call_internal_gateway() to the organization's actual internal "
-        "AI-model API before running against real users."
+    client = OpenAI(base_url=base_url, api_key=api_key)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
     )
+    return response.choices[0].message.content or ""

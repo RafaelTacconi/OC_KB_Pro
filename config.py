@@ -3,6 +3,9 @@ config.py — fixed test-user list and seed helpers.
 
 Per spec constraint 6 (Section 5): no real authentication for the PoC.
 A hardcoded test-user list is correct and expected. Do not build login/SSO.
+
+SPEC §14.2: load_dotenv() runs at import (app.py imports this early), so
+`models/` lazy environment reads see `.env` values regardless of import order.
 """
 
 from __future__ import annotations
@@ -10,7 +13,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from dotenv import load_dotenv
+
 from db import transaction
+
+load_dotenv()  # no-op with no .env present — never a crash on startup (SPEC §14.2)
 
 # Edit this list for your actual PoC test group.
 TEST_USERS = [

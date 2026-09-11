@@ -19,6 +19,7 @@ from pathlib import Path
 import streamlit as st
 
 from config import DEFAULT_WORKSPACE_ID, TEST_USERS, bootstrap
+from models.credentials import api_key_status
 from ui.chat_view import render_chat_view
 from ui.owner_view import render_owner_view
 from ui.pills import pill, render as render_pill
@@ -56,6 +57,30 @@ with st.sidebar:
         "Owner": ROLE_PILL_MAP["owner"],
         "Member": ROLE_PILL_MAP["member"],
     }))
+
+    # --- API key expiry (SPEC §14.5) ----------------------------------------
+    # Informational only, evaluated once per render. Never blocks anything.
+    # OPEN-12 interim: expiring/unknown -> Owners only; expired -> everyone.
+    _key_status = api_key_status()
+    if _key_status.state == "expired":
+        render_pill(pill(
+            f"API key expired on {_key_status.expires_on}",
+            {"expired": ("red", "\u2715")},
+        ))
+        st.caption("Answer calls will fail until the API key is renewed.")
+    elif _key_status.state == "expiring" and current_user["role"] == "owner":
+        render_pill(pill(
+            f"API key expires {_key_status.expires_on} "
+            f"({_key_status.days_remaining}d)",
+            {"expiring": ("orange", "\u26a0")},
+        ))
+        st.caption("Renew the API key in .env before it expires.")
+    elif _key_status.state == "unknown" and current_user["role"] == "owner":
+        render_pill(pill(
+            "No API key expiry date set",
+            {"unknown": ("gray", "\u25cf")},
+        ))
+        st.caption("Set OPENAI_API_KEY_EXPIRES_ON to get advance warning.")
 
     st.divider()
 
