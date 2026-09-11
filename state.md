@@ -12,7 +12,7 @@ steps an implementing agent can complete are done; what remains needs you.
 
 **Implemented and green (Steps 1–7 + SPEC §15).** The full test suite passes from a
 clean clone: `git clone` → fresh venv → `pip install -r requirements.txt` →
-`python -m pytest tests/ -q` → **61 passed**. Acceptance matrix for A1–A25 is in
+`python -m pytest tests/ -q`  → **67 passed**. Acceptance matrix for A1–A25 is in
 `ACCEPTANCE_MATRIX.md`. §15 added A26–A28 (embedded-image visibility + no-model
 send block). What has never been exercised: a **live model call** and **real
 documents**. A `.env` is configured in this repo (OpenRouter-compatible endpoint
@@ -113,14 +113,13 @@ wrong — `fits_in_context()` uses it.
 
 ```
 python -m pytest tests/ -q
-61 passed in 35.86s   (2026-09-11)
+67 passed in 47.04s   (2026-09-11)
 ```
 Verified from a **clean clone** earlier (fresh venv, fresh install): 55 passed at
-`a9d033c`; the later A3/§15 additions brought it to 61. No `data/` is ever written
-into the repo root by the suite (conftest guard). NOTE: the suite must run from a
-cwd with no `.env` (tests blank the model vars themselves), so a stray `data/`
-from a manually-launched app must be removed before `pytest` or the conftest
-guard trips.
+`a9d033c`; the later A3/§15/UI/membership additions brought it to 67. The conftest
+`data/` guard is now snapshot-based: a pre-existing `data/` from a stopped app is
+tolerated; the suite fails only if the TESTS create/modify/delete repo `data/`.
+The suite must still run with the app STOPPED (a live app writes to `data/`).
 
 ## Next action
 

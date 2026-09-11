@@ -7,6 +7,51 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — UI review pass + OPEN-4 closed (per-Workspace membership)
+
+Two owner-directed workstreams after the real-corpus findings.
+
+**UI review pass (items 1–6) + audit fix**
+1. Duplicate "Workspace" sidebar label removed (eyebrow is the label).
+2. Divider separates the Workspace switcher from `render_brand` (product label
+   vs working Workspace no longer read as one block).
+3. **API-expiry pill colour was a real bug** (audit): `pill()` looks up the
+   class_map by the formatted VALUE, but the map was keyed on the status name,
+   so all three expiry branches silently rendered grey. Fixed: key by the exact
+   display string — expired→red, expiring→orange, unknown→gray. **Audit
+   result:** these were the ONLY three `pill()` call sites keyed on a formatted
+   string; all owner_view/source/role maps are correctly keyed on raw values.
+4. Chat header now lists the indexed FILE NAMES to every user (Members know
+   what they ask against), not just a count; the zero-knowledge message is now
+   GREY (design-system pill) not Streamlit-yellow.
+5. Model picker (owner-approved, SPEC §14.3 note added): each option shows the
+   display_name AND the real .env slug as read-only context
+   ("Standard (openai/gpt-4o)"). Registry still owns the label, .env the slug.
+6. Task row wraps into rows of up to 4 instead of one `st.columns(n)` — survives
+   5/10/20 tasks.
+
+**OPEN-4 closed — per-Workspace membership (level (a))**
+- New Workspaces are owned by their creator only (no longer every TEST_USER).
+- Manage → Users: Owner can add/remove members per Workspace; the Owner cannot
+  be removed.
+- `create_workspace()` / `add_member()` / `remove_member()` in config.py.
+
+**Deployment note (OPEN-13, decision 2026-09-11):** authentication is deferred
+to the network/reverse-proxy layer in front of the Streamlit port. Until that
+gate exists, anyone reaching the port can select "Alex (Owner)" and delete any
+knowledge base. Per-Workspace membership does NOT protect against this (it
+gates visibility, not identity). Recorded in `state.md`'s Step-8 section and
+`memory.md`.
+
+**Tests:** A21 expects slug-suffixed picker labels; A17 checks the grey
+markdown note; new `test_task_row_wrap.py` (2), `test_membership.py` (3); A1/A5
+updated for owner-only new-Workspace membership. **62 → 67 passed.**
+
+**Schema and migration changes**
+- None. `workspace_members` already existed.
+
+---
+
 ## 2026-09-11 — §15 work: embedded-image visibility + no-model send block
 
 New work beyond the §14 addendum, per SPEC.md §15 (added 2026-09-11). Two
