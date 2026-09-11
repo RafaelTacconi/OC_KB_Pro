@@ -233,6 +233,17 @@ manually-changed selection or a create bumps `wa_ws_gen`, making Streamlit treat
 new and re-initialize from `index`. This is the fix for the Step-5 item-2 double-answer trap
 (§5.2.1). The counter is intentional, not cruft — do not "simplify" it into a bare key.
 
+### 2026-09-11 — chunk_text accumulates FRACTIONAL tokens; do not round per paragraph
+`ingestion/chunking.py::chunk_text` accumulates `len(para.split()) * WORDS_TO_TOKENS` as a
+FLOAT across paragraphs and casts once at finalize (`int(current_tokens)`). The §7.8
+`estimate_tokens` de-dupe moved the shared function to `models/context_budget.py` and made
+`chunking` import it, but left this accumulation EXACTLY as-is. Switching to per-paragraph
+integer rounding would shift chunk boundaries (`target_tokens` comparisons happen on the
+fractional running total), and the existing `test_chunk_text_respects_target_size`'s ±60
+tolerance might not catch the shift. Guarded by
+`test_chunk_boundaries_unchanged_after_dedupe`, which pins the layout against a reference
+implementation. Do not "simplify" the float arithmetic.
+
 ---
 
 ## Rejected approaches

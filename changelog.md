@@ -7,6 +7,64 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Step 7 — Cleanup (§7.6, §7.7, §7.8)
+
+The final implementable build-order step. Everything an agent can finish without
+the project owner is now done.
+
+**Modified**
+- `ui/chat_view.py` — §7.6 (option a, the only behavioural change): a free-text
+  send while a Task is selected clears the Task selection and, on the next
+  render, shows an inline note that the Task was not applied — the message is
+  persisted untagged (task_id NULL), so the user isn't misled by a still-lit
+  Task chip. Composes with the §7.1 pending-error flow (both fire together).
+- `ingestion/pipeline.py` — §7.7: explicit comment at `delete_source()` that
+  `chunks_fts` (external-content FTS5) rows MUST be deleted before `chunks`
+  rows, with the reason and a guard for future bulk/Workspace deletes.
+- `models/context_budget.py` — §7.8: `WORDS_TO_TOKENS` and `estimate_tokens`
+  defined here once.
+- `ingestion/chunking.py` — §7.8: imports both from `context_budget` and
+  re-exports for back-compat. Its fractional per-paragraph accumulation is
+  UNCHANGED (no per-paragraph int rounding — that would shift chunk boundaries).
+- `ui/pills.py` — §7.8: `ROLE_PILL_MAP` moved here (the natural leaf home);
+  no new imports pulled into it.
+- `app.py`, `ui/owner_view.py` — import `ROLE_PILL_MAP` from `ui.pills`.
+- `.streamlit/config.toml` — §7.8: removed the `static/fonts/README.md`
+  reference (chose removal over creating the file, per owner).
+- `ui/owner_view.py` — §7.8: raw `sources.error_message` displayed to Owners is
+  now prefixed with "Indexing failed — "; the two `st.success`-then-`rerun`
+  toasts are replaced by a `wa_owner_toast` session flag rendered after the
+  rerun in `render_owner_view`.
+
+**§7.8 "already done" items (not redone)**
+- Brittle alignment hack (the `margin-top: 1.6rem` model-note) — done in Step 2b.
+- `models/registry.py` docstring pointing at `ui/model_picker.py` — the
+  reference was already gone after the Step 2b registry rewrite; only
+  `state.md`/`SPEC.md` still mention it (as the defect record).
+
+**Tests added**
+- `tests/test_chunking_and_prompt.py::test_chunk_boundaries_unchanged_after_dedupe`
+  (§7.8) — pins the exact chunk boundary layout against a reference
+  implementation, so the estimate_tokens de-dupe can't silently shift
+  boundaries (the ±60 tolerance in the existing test might not catch it).
+- `tests/test_task_vs_freetext.py` (3, §7.6) — free-text during an active task
+  clears + notes; no task → no note; and the §7.6 × §7.1 interaction (failing
+  model still persists the user message, clears the task, shows both the note
+  and the retry bubble).
+
+**Schema and migration changes**
+- None.
+
+**Acceptance criteria satisfied**
+- A18/A19 continue to hold (journal maintained). No new A-numbers; §7.6/7.7/7.8
+  are defect fixes.
+
+**Known-broken / deferred**
+- Step 8 only — needs real documents + live endpoint (owner inputs). The
+  `offline_retrieval_eval.py` CLI-arg change (§9.3) is itself part of Step 8.
+
+---
+
 ## 2026-09-11 — Step 6 — Visibility (§5.2.4 grounding + §7.5 model attribution)
 
 **Modified**
