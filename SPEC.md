@@ -576,6 +576,12 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A24. `.env` is git-ignored; `.env.example` is committed and contains every variable; no real key or base URL appears anywhere in the repository's history.
 - A25. `call_model()`'s signature is unchanged and `tests/test_chat_error_handling.py` still passes.
 
+**Embedded-image visibility and no-model send block** (§15)
+
+- A26. For each ingested PDF/DOCX, the `sources` row stores an `image_count` (the number of embedded images found during parsing); it is 0 or more and never blocks ingestion.
+- A27. In Manage → Knowledge, an Owner sees a per-file note "N images — their content is not indexed" whenever that file's `image_count > 0`.
+- A28. With no model configured, the chat `st.chat_input` and the task buttons are DISABLED (not hidden) so no message can be sent; the "No AI model is configured" warning is the single explanation, and no send ever fails with a raw `Unknown model_id None`.
+
 ---
 
 ## 11. Open questions
@@ -840,3 +846,62 @@ returning a frozen dataclass with `state`, `expires_on`, and `days_remaining`, w
 - A second configuration mechanism. `.env` is it — no YAML, no JSON, no `secrets.toml`, no settings UI.
 - Per-Workspace or per-user model credentials. One endpoint, one key, application-wide.
 - Building authentication in response to §14.1.
+
+---
+
+## 15. Embedded-image visibility and no-model send block
+
+New work beyond Addendum A, added 2026-09-11 at the project owner's request. Tag
+conventions as per §0.1.
+
+### 15.1 Embedded-image visibility at upload `[NEW]`
+
+The real back-office procedures are image-heavy (screenshots, diagrams, scanned
+figures). The pipeline (SPEC §2/§7) extracts and indexes **text only** — image
+content is never read. To make that gap visible to the Owner rather than silent
+(the mixed text-plus-screenshots case fails silently; only a fully-scanned PDF
+fails loudly via the zero-sections `failed` path), count embedded images per file
+during parsing.
+
+**Count, stored on the `sources` row:**
+
+- Add a nullable `image_count INTEGER` column to `sources` via the existing
+  `migrate_db()` pattern (SPEC §4.5). NULL/absent means "not counted" (e.g. rows
+  inserted before this column or an XLSX, which has no meaningful embedded-image
+  count for this purpose).
+- During `parse_pdf` / `parse_docx`, count the embedded images:
+  - **PDF:** `Image`/`Figure`-type elements from the `unstructured` stream, or a
+    pypdf XObject scan in the fallback path.
+  - **DOCX:** `python-docx` `document.inline_shapes` (and drawings via XML), or
+    `Image`-type `unstructured` elements.
+- Only what is already installed — **no new dependency.**
+- The count never blocks ingestion; it is written alongside `status='indexed'`.
+
+**UI (Manage → Knowledge, Owner only):**
+
+- For a Source with `image_count > 0`, show a note under that file:
+  "N images — their content is not indexed", using the existing caption/pill
+  style. No new visual language.
+
+**Known limitation — the count is a floor:** vector diagrams and curve-rendered
+text may not register as countable raster images, so the count is a lower bound,
+never a guarantee about how much image content exists. It flags presence, not
+semantic content.
+
+**Explicitly out of scope:** OCR and image reading of any kind. The image content
+is not extracted, transcribed, or embedded — the warning only surfaces its
+presence. (See memory.md — OCR scoped-and-deferred.)
+
+### 15.2 No-model send block `[NEW]` — amends §14.3/A20
+
+When no model is configured (`list_models()` empty), the app already shows
+"No AI model is configured" (SPEC §14.3, A20). A gap: the send paths stayed
+enabled, so a message could still be typed and would fail with a raw
+`Unknown model_id None` in the §7.1 bubble — not the clear single message A20
+intended.
+
+**Behaviour:** with no model configured, the chat `st.chat_input` and the task
+buttons are DISABLED (not hidden), so no send can occur. The existing warning is
+the single explanation — it reads as "fix your config", not "the app is broken".
+Disabling (rather than hiding) keeps the layout stable and signals the controls
+exist but are gated on configuration.

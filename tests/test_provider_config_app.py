@@ -32,6 +32,26 @@ def _env(monkeypatch: pytest.MonkeyPatch, **values: str) -> None:
         monkeypatch.setenv(k, v)
 
 
+def _blank_all_model_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force an empty model config for the test.
+
+    AppTest.from_file runs app.py with cwd = the repo root, so config.py's
+    load_dotenv() would load the real `.env` even though the test chdir's to a
+    temp dir. Setting every OPENAI_* var to "" (rather than delenv) makes
+    load_dotenv() a no-op for them (it never overrides an existing var), so the
+    test really exercises the no-config / partial-config path.
+    """
+    for k in (
+        "OPENAI_BASE_URL",
+        "OPENAI_API_KEY",
+        "OPENAI_API_KEY_EXPIRES_ON",
+        "OPENAI_MODEL_FAST",
+        "OPENAI_MODEL_STANDARD",
+        "OPENAI_MODEL_REASONING",
+    ):
+        monkeypatch.setenv(k, "")
+
+
 def _run_no_model_check(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> AppTest:
@@ -40,6 +60,13 @@ def _run_no_model_check(
     at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()
     assert not at.exception, list(at.exception)
     assert any("No AI model is configured" in w.value for w in at.warning)
+    # A20 (option 1): the send path is BLOCKED, not hidden — chat input and
+    # task buttons are disabled so it reads "fix your config", and no send can
+    # fail with a raw "Unknown model_id None".
+    assert at.chat_input[0].proto.disabled
+    for b in at.button:
+        if b.key and b.key.startswith("task_btn_"):
+            assert b.proto.disabled, f"task button {b.key} should be disabled"
 
     # Manage still works for the owner.
     at.button(key="nav_manage").click().run()
@@ -51,10 +78,8 @@ def _run_no_model_check(
 def test_a20_no_env_no_stack_trace_and_no_model_message(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # Ensure nothing is configured.
-    monkeypatch.delenv("OPENAI_MODEL_FAST", raising=False)
-    monkeypatch.delenv("OPENAI_MODEL_STANDARD", raising=False)
-    monkeypatch.delenv("OPENAI_MODEL_REASONING", raising=False)
+    # Blank every model var so a real .env on disk cannot leak into the test.
+    _blank_all_model_env(monkeypatch)
     _run_no_model_check(monkeypatch, tmp_path)
 
 
@@ -66,6 +91,7 @@ def test_a20_partial_config_missing_key_or_base_url(
     # A model that cannot be called must not be shown, so the SAME clear
     # "no model configured" message appears instead of an inline failure on
     # every send.
+    _blank_all_model_env(monkeypatch)
     _env(
         monkeypatch,
         OPENAI_MODEL_FAST="fast-real",

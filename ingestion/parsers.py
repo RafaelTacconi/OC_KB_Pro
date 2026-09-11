@@ -24,6 +24,73 @@ class ParsedSection:
     text: str
 
 
+def count_embedded_images(file_path: str, source_type: str) -> int:
+    """
+    SPEC §15.1 — count the embedded raster images in a PDF/DOCX, so the Owner
+    can be told "N images — their content is not indexed". Returns 0 for
+    XLSX (no meaningful embedded-image count for this purpose).
+
+    Uses only what is already installed; never raises — a count failure is a
+    floor, not an error.
+
+    KNOWN LIMITATION (documented in SPEC §15.1 / memory.md): the count is a
+    FLOOR. Vector diagrams and curve-rendered text may not register as
+    countable raster images, so this is a lower bound on embedded images, not
+    an exact figure, and it never reflects semantic content.
+    """
+    try:
+        if source_type == "pdf":
+            return _count_images_pdf(file_path)
+        if source_type == "docx":
+            return _count_images_docx(file_path)
+        return 0  # xlsx
+    except Exception:  # noqa: BLE001 - count is informational; never block ingest
+        return 0
+
+
+def _count_images_pdf(file_path: str) -> int:
+    """Try `unstructured`'s element stream first (Image/Figure elements),
+    fall back to a pypdf XObject scan of each page."""
+    try:
+        from unstructured.partition.pdf import partition_pdf
+
+        elements = partition_pdf(filename=file_path)
+        return sum(1 for el in elements if type(el).__name__ in ("Image", "Figure"))
+    except Exception:  # noqa: BLE001
+        from pypdf import PdfReader
+
+        reader = PdfReader(file_path)
+        total = 0
+        for page in reader.pages:
+            try:
+                xobjects = page.get("/Resources", {}).get("/XObject", {}) or {}
+            except Exception:  # noqa: BLE001
+                continue
+            total += sum(
+                1 for xobj in xobjects.values()
+                if xobj.get_object().get("/Subtype") == "/Image"
+            )
+        return total
+
+
+def _count_images_docx(file_path: str) -> int:
+    """python-docx inline_shapes + drawings; fall back to the `unstructured`
+    DOCX element stream (Image elements)."""
+    try:
+        import docx  # python-docx
+
+        document = docx.Document(file_path)
+        return len(document.inline_shapes)
+    except Exception:  # noqa: BLE001
+        try:
+            from unstructured.partition.docx import partition_docx
+
+            elements = partition_docx(filename=file_path)
+            return sum(1 for el in elements if type(el).__name__ == "Image")
+        except Exception:  # noqa: BLE001
+            return 0
+
+
 def parse_pdf(file_path: str) -> list[ParsedSection]:
     """
     Try `unstructured`'s partition_pdf first (layout-aware: detects

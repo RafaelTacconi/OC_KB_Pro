@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from db import get_connection, transaction
 from ingestion.chunking import build_embedding_text, chunk_text
 from ingestion.embedding import embed_batch
-from ingestion.parsers import parse
+from ingestion.parsers import count_embedded_images, parse
 
 SUPPORTED_SOURCE_TYPES = {"pdf", "docx", "xlsx"}  # 'confluence' reserved, not active (4a)
 
@@ -48,6 +48,10 @@ def ingest_source(file_path: str, source_type: str, source_id: str, workspace_id
                 f"source_type {source_type!r} is not supported in this build. "
                 f"(Confluence is reserved for a future round — see spec Section 4a.)"
             )
+
+        # SPEC §15.1: count embedded images so the Owner can be told their
+        # content is not indexed. Count is a floor; never blocks ingestion.
+        image_count = count_embedded_images(file_path, source_type)
 
         sections = parse(file_path, source_type)
         if not sections:
@@ -92,10 +96,11 @@ def ingest_source(file_path: str, source_type: str, source_id: str, workspace_id
             conn.execute(
                 """
                 UPDATE sources
-                SET status = 'indexed', error_message = NULL, indexed_at = ?
+                SET status = 'indexed', error_message = NULL, indexed_at = ?,
+                    image_count = ?
                 WHERE source_id = ?
                 """,
-                (_now(), source_id),
+                (_now(), image_count, source_id),
             )
 
     except Exception as exc:  # noqa: BLE001 - intentionally broad; see docstring

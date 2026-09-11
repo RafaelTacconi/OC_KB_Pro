@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS sources (
     status          TEXT NOT NULL,
     error_message   TEXT,
     indexed_at      TEXT,
+    image_count     INTEGER,        -- embedded images during parse (SPEC §15.1)
     created_at      TEXT NOT NULL
 );
 
@@ -171,7 +172,9 @@ def migrate_db(db_path: str | Path = DB_PATH) -> None:
     2. Backfill: for each distinct (workspace_id, user_id) with NULL chat_id,
        create one `chats` row titled "Imported conversation" with
        created_at = earliest message timestamp, updated_at = latest.
-    3. Create the indexing views (SPEC §4.4).
+    3. Add `sources.image_count` if absent (SPEC §15.1) — nullable; NULL means
+       "not counted" for pre-existing/legacy rows.
+    4. Create the indexing views (SPEC §4.4).
     """
     conn = get_connection(db_path)
     try:
@@ -180,7 +183,13 @@ def migrate_db(db_path: str | Path = DB_PATH) -> None:
         cols = [r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)")]
         if "chat_id" not in cols:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN chat_id TEXT REFERENCES chats(chat_id)")
-        # 3. Indexes (AFTER the ALTER — they reference chat_id).
+
+        # 3. sources.image_count (SPEC §15.1)
+        source_cols = [r["name"] for r in conn.execute("PRAGMA table_info(sources)")]
+        if "image_count" not in source_cols:
+            conn.execute("ALTER TABLE sources ADD COLUMN image_count INTEGER")
+
+        # 4. Indexes (AFTER the ALTERs — they reference chat_id).
         conn.executescript(INDEXES)
 
         # 2. Backfill — only rows still NULL (created before this migration).

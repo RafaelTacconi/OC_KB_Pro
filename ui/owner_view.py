@@ -167,6 +167,14 @@ def _render_knowledge_section(workspace_id: str) -> None:
                 else:
                     cols = st.columns([5, 2, 1], vertical_alignment="center")
                     cols[0].markdown(f"**{src['display_name']}**")
+                    # SPEC §15.1 — embedded-image visibility. The count is a
+                    # floor (vector diagrams/curve text may not register).
+                    img_count = src.get("image_count") or 0
+                    if img_count > 0:
+                        cols[0].caption(
+                            f"{img_count} image{'s' if img_count != 1 else ''} — "
+                            "their content is not indexed"
+                        )
                     with cols[1]:
                         render_pill(pill(src["status"], SOURCE_STATUS_MAP))
                         if src["status"] == "failed" and src.get("error_message"):

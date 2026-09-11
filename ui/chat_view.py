@@ -425,7 +425,7 @@ def _render_model_picker(workspace_id: str) -> str | None:
     return selected_model_id
 
 
-def _render_task_row(workspace_id: str, tasks: list[dict]) -> dict | None:
+def _render_task_row(workspace_id: str, tasks: list[dict], disabled: bool = False) -> dict | None:
     st.markdown('<div class="wa-eyebrow">Predefined tasks</div>', unsafe_allow_html=True)
 
     if not tasks:
@@ -444,6 +444,7 @@ def _render_task_row(workspace_id: str, tasks: list[dict]) -> dict | None:
                 key=f"task_btn_{task['task_id']}",
                 use_container_width=True,
                 type="primary" if is_active else "secondary",
+                disabled=disabled,
             ):
                 st.session_state[f"selected_task_{workspace_id}"] = (
                     None if is_active else task["task_id"]
@@ -572,14 +573,20 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
 
     selected_model_id = _render_model_picker(workspace_id)
     if selected_model_id is None:
-        # SPEC §14.3: no model configured in .env. App stays up; Manage and
-        # ingestion continue to work (A20). The chat input stays visible but
-        # any send fails gracefully via the §7.1 handler.
+        # SPEC §14.3 / A20: no model configured in .env. App stays up; Manage
+        # and ingestion continue to work. Block the SEND paths (not hide them)
+        # so it reads as "fix your config", not "the app is broken": the chat
+        # input and task buttons are disabled while this warning is the single
+        # explanation. Without this block, a send fails with a raw
+        # "Unknown model_id None" in the §7.1 bubble instead.
         st.warning(
             "No AI model is configured. Copy `.env.example` to `.env` and set "
             "`OPENAI_BASE_URL`, `OPENAI_API_KEY`, and at least one "
             "`OPENAI_MODEL_*` slug, then restart the app."
         )
+        no_model = True
+    else:
+        no_model = False
     st.divider()
 
     # --- Chat selector + "+ New chat" (SPEC §6.2) --------------------------
@@ -637,7 +644,7 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
 
     # --- Predefined tasks (constraint 7: no live "/" autocomplete) ----------
     tasks = _load_tasks(workspace_id)
-    active_task = _render_task_row(workspace_id, tasks)
+    active_task = _render_task_row(workspace_id, tasks, disabled=no_model)
 
     if active_task:
         with st.container(border=True):
@@ -647,8 +654,12 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
                 unsafe_allow_html=True,
             )
             with st.form(key=f"task_form_{active_task['task_id']}"):
-                task_input = st.text_area(active_task["input_label"], height=120)
-                submitted = st.form_submit_button("Run task", type="primary")
+                task_input = st.text_area(
+                    active_task["input_label"], height=120, disabled=no_model
+                )
+                submitted = st.form_submit_button(
+                    "Run task", type="primary", disabled=no_model
+                )
             if submitted and task_input.strip():
                 _answer(workspace_id, user_id, task_input, selected_model_id,
                         chat_id=active_chat_id, task=active_task)
@@ -656,7 +667,7 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
                 st.rerun()
 
     # --- Free-form chat input -------------------------------------------------
-    user_question = st.chat_input("Type your question...")
+    user_question = st.chat_input("Type your question...", disabled=no_model)
     if user_question:
         # SPEC §7.6 (option a): a free-text send while a Task is selected sends
         # an UNTAGGED message — clear the selection and note inline that the
