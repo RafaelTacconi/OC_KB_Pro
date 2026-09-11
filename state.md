@@ -45,6 +45,15 @@ documents. Nothing in this section is runnable without them.
      warning shows to Owners only, `expired` shows red to everyone.
 4. `streamlit run app.py` — sign in as **Alex (Owner)**.
 
+> **DEPLOYMENT WARNING (OPEN-13, decision 2026-09-11):** the app has NO
+> authentication and never will in this PoC. Anyone who can reach the
+> Streamlit port can select "Alex (Owner)" from the sign-in dropdown and
+> upload/edit/delete any Workspace and its knowledge sources. Per-Workspace
+> membership (Manage → Users) only gates *visibility*, not *identity* — it does
+> NOT protect against this. **Before exposing the port to anyone but you, put a
+> network/reverse-proxy auth layer in front of it.** Until then, treat the port
+> as admin access to the whole corpus.
+
 A send should now return a live answer. If it fails: the §7.1 inline error with
 the exception in the expander tells you why (auth, timeout, model slug …). If the
 error says "not recognized"/"deployment not found"-style, STOP — that indicates

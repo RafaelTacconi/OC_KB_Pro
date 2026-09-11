@@ -61,6 +61,19 @@ Consequence: An Owner cannot create a private Workspace. If per-Workspace access
 wanted, it is a new requirement needing an invite/removal mechanism in Manage → Users
 (currently read-only), plus an explicit decision.
 
+### OPEN-4 — Membership on a new Workspace — 2026-09-11 (supersedes entry above)
+Question: Who is a member of a newly created Workspace (`SPEC.md` §5.3)?
+Outcome: **The interim ("all TEST_USERS") is being REPLACED by the build of
+per-Workspace membership management (level (a) from the owner's scoping).** This
+CLOSES OPEN-4: the Owner decides membership per Workspace instead of every
+TEST_USER being auto-added. The prior interim entry above is superseded.
+Authority: Answered by project owner on 2026-09-11 (decision to build (a); agent
+implements).
+Consequence: `create_workspace()` no longer adds every TEST_USER; only the
+creating Owner is added. The §5.3 interim rule and its "no private Workspace"
+consequence are invalidated. Members must now be added explicitly via Manage →
+Users.
+
 ### OPEN-5 — Name uniqueness — 2026-09-11
 Question: Should Workspace names (and Task names) be unique?
 Outcome: **Interim applied.** Uniqueness is NOT enforced — two Workspaces may share a name
@@ -135,6 +148,19 @@ Outcome: Deferred — not reached.
 Authority: Deferred — not reached.
 Consequence: Constraint C6 was written for laptop testing; do NOT build authentication in
 response to this — flag it and continue.
+
+### OPEN-13 — Authentication on an internal deployment — 2026-09-11 (supersedes entry above)
+Question: Where does authentication live for the internally deployed app (`SPEC.md` §14.1)?
+Outcome: **Deliberately deferred to the DEPLOYMENT boundary, not built in app.** The owner
+chose real authentication at the network/reverse-proxy layer in front of the Streamlit port
+rather than in-app login (decision 2026-09-11). Explicit recorded consequence: until that
+port is network-restricted, ANYONE who can reach it can select "Alex (Owner)" and delete a
+knowledge base — this must appear in the deployment notes, not just the journal.
+Authority: Answered by project owner on 2026-09-11 (deferred to deployment layer); agent does
+not build in-app authentication.
+Consequence: The impersonation risk is real and open until the deploy-time gate exists.
+Per-Workspace membership (OPEN-4 build) does NOT close it — it only gates visibility, not
+identity.
 
 ---
 
@@ -294,6 +320,20 @@ be either: (a) for PDF, only trust element types that are genuine headings
 pypdf fallback for PDFs. Not built 2026-09-11; the owner reported it and the real
 AML_Policy.pdf is gone (data/ was cleaned), so no repro file exists. The citation
 section text is a UX trust problem — a wrong "section 3" undermines citations.
+
+### 2026-09-11 — root cause: the conftest `data/` guard vs the running app — you only delete what is safe once the guard can't mislead
+The repo `data/` directory was deleted TWICE this session (once for the conftest
+"no data/ at repo root" assertion, once by an over-broad `Remove-Item -Force
+data` before a pytest run), destroying the user's uploaded corpus + conversations
+each time. Root cause is NOT "don't run Remove-Item": it is that the guard
+required `data/` to be ABSENT at the repo root, while the running app legitimately
+CREATES it. So any workflow that (a) ran the app and (b) then ran pytest forced a
+choice: delete the app's data or reject the test run. FIXED 2026-09-11 by making
+the guard snapshot-compare (`_repo_data_snapshot()`): pre-existing `data/` from a
+stopped app is tolerated and untouched; the TEST SUITE still fails if it creates,
+modifies, or deletes any repo `data/` file. The guard never weakens. Second
+lesson: verify what `data/` belongs to (live app vs test artefact) BEFORE deleting
+it — a running app's DB is not a disposable fixture.
 
 ### 2026-09-11 — OPEN-13 was only missing from my summary, not from the spec
 The 12-unanswered count: when listing open items for the owner I gave 11

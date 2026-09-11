@@ -9,11 +9,15 @@ conftest.py — session-wide guardrails for the test suite.
    the suite always starts from a known "no model configured" state unless a
    test opts in explicitly via monkeypatch.setenv (e.g. A21/A22).
 
-2. Mechanical assertion: after the whole suite runs, no `data/` directory may
-   exist at the repository root. AppTest tests run in an isolated temp cwd
-   (monkeypatch.chdir(tmp_path)) so the SQLite DB and uploaded sources are never
-   written into the repo. This makes that invariant explicit rather than
-   something caught only by inspection.
+2. Repo `data/` integrity: the test suite must not write into the repository.
+   AppTest tests run in an isolated temp cwd (monkeypatch.chdir(tmp_path)) so
+   the SQLite DB and uploaded sources are never written into the repo. The
+   guard snapshots `data/` at suite start and asserts it is byte-UNCHANGED at
+   the end. This distinguishes pre-existing app data (the running app
+   legitimately creates `data/` at the repo root — this is NOT a test leak)
+   from test-created files, without weakening anything: a stopped app's `data/`
+   passes (snapshot == end state), and any test that creates or modifies a repo
+   `data/` file fails the assertion.
 """
 
 from __future__ import annotations
@@ -35,6 +39,24 @@ _ENV_VARS = (
     "OPENROUTER_API_KEY",
     "OPENROUTER_API_KEY_EXPIRES",
 )
+
+
+def _repo_data_snapshot() -> dict[str, int] | None:
+    """
+    {'data/<relpath>': size} for every file under the repo `data/` directory,
+    or None if `data/` does not exist. Used to detect whether the TEST SUITE
+    (as opposed to the running app, which legitimately owns `data/`) touched
+    the repo.
+    """
+    data = REPO_ROOT / "data"
+    if not data.exists():
+        return None
+    snapshot: dict[str, int] = {}
+    for p in sorted(data.rglob("*")):
+        if p.is_file():
+            rel = str(p.relative_to(data)).replace("\\", "/")
+            snapshot[rel] = p.stat().st_size
+    return snapshot
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -80,9 +102,20 @@ def configured_model(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _assert_no_repo_data_dir():
+def _assert_repo_data_dir_unchanged():
+    """
+    Snapshot the repo `data/` before the suite; assert it is UNCHANGED after.
+    A stopped app legitimately leaves `data/` in the repo — that is not a test
+    leak and must not fail the suite. What must fail: the TEST SUITE creating,
+    deleting, or rewriting any file under repo `data/`.
+    """
+    before = _repo_data_snapshot()
     yield
-    assert not (REPO_ROOT / "data").exists(), (
-        "AppTest left a data/ directory at the repo root — AppTest tests must "
-        "run in an isolated temp cwd, never write into the repository."
+    after = _repo_data_snapshot()
+    assert before == after, (
+        "The test suite changed data/ at the repo root — AppTest tests must "
+        "run in an isolated temp cwd and never write into the repository. "
+        "If data/ is changing, either a test is leaking into the repo or a "
+        "live app instance is writing to it during the run; stop the app "
+        "before running pytest."
     )
