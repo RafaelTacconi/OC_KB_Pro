@@ -252,6 +252,15 @@ surface (SDK exception shapes, timeouts mid-stream, auth errors) is unverified.
 When a live endpoint exists, a single manual send against a bad key/slug would
 close this gap; it is not code that needs changing.
 
+### 2026-09-11 — OPEN-13 was only missing from my summary, not from the spec
+The 12-unanswered count: when listing open items for the owner I gave 11
+(OPEN-1..10 + OPEN-12), omitting **OPEN-13** (the deployed app has no
+authentication — anyone reaching the port can sign in as Owner and delete any
+Workspace). It IS present in SPEC §11 (the addendum row) and in memory.md's
+Decision log; only my summary dropped it. It belongs on the decide-before-test-
+users shortlist — §14.1 flags it as a deployment decision (network-restricted
+host vs a gate). No spec fix needed.
+
 ### 2026-09-11 — chunk_text accumulates FRACTIONAL tokens; do not round per paragraph
 `ingestion/chunking.py::chunk_text` accumulates `len(para.split()) * WORDS_TO_TOKENS` as a
 FLOAT across paragraphs and casts once at finalize (`int(current_tokens)`). The §7.8

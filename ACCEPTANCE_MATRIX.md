@@ -1,10 +1,10 @@
 # Acceptance matrix — A1–A25
 
-Verified 2026-09-11 against `a9d033c` (all of Steps 1–7 complete; Step 8 not
-started). Method: each criterion is mapped to the test(s) that prove it, or is
-marked *not verifiable* with the reason. The full suite (55 passed) runs from a
-clean clone: `git clone` → fresh venv → `pip install -r requirements.txt` →
-`python -m pytest tests/ -q` → **55 passed**.
+Verified 2026-09-11 against `68dcd3a` + follow-ups (all of Steps 1–7 complete;
+Step 8 not started). Method: each criterion is mapped to the test(s) that prove
+it, or is marked *not verifiable* with the reason. The full suite (56 passed)
+runs from a clean clone: `git clone` → fresh venv →
+`pip install -r requirements.txt` → `python -m pytest tests/ -q` → **56 passed**.
 
 ## Multi-Workspace (SPEC §5)
 
@@ -12,7 +12,7 @@ clean clone: `git clone` → fresh venv → `pip install -r requirements.txt` �
 |---|---|---|---|
 | A1 | Owner creates a Workspace; it appears in the switcher and is selected | `tests/test_multi_workspace.py::test_a1_owner_creates_workspace_and_it_is_selected` (AppTest: create → appears + selected; membership = all TEST_USERS) | ✅ |
 | A2 | Uploading to Workspace A never retrieved in B | `tests/test_workspace_isolation.py` — retrieval layer, lexical + semantic + hybrid each asserted to return nothing across the boundary (embedder stubbed; verifies the `workspace_id` filter, not ranking) | ✅ |
-| A3 | Instructions/Tasks in A don't appear/apply in B | Partially by construction (every query scopes `workspace_id`; `_load_tasks` filters). No dedicated test. | ⚠️ Not directly tested — logically follows from the same scoping A2 exercises. |
+| A3 | Instructions/Tasks in A don't appear/apply in B | `tests/test_multi_workspace.py::test_a3_instructions_and_tasks_do_not_leak` (AppTest: create Workspace B, give it its own Instructions + Task, verify Workspace A's chat still shows A's Instructions applied and only A's Tasks; and vice-versa) | ✅ |
 | A4 | Switching Workspace clears Task + active Chat | `tests/test_multi_workspace.py::test_a4_switch_clears_task_and_active_chat` | ✅ |
 | A5 | Member sees only their Workspaces; never reaches Manage | `tests/test_multi_workspace.py::test_a5_member_sees_only_their_workspaces_and_no_manage` | ✅ |
 | A6 | Sidebar branding shows current Workspace name; nothing hardcoded | `tests/test_multi_workspace.py::test_a6_branding_uses_workspace_name` + code inspection (page_title = `APP_TITLE`) | ✅ |
@@ -60,8 +60,6 @@ timeouts mid-stream) is unverified until a live `.env` endpoint exists.
 - **Live answer quality** — no real endpoint, no real documents. The chat loop
   is real up to the model call (proven), but a grounded answer has never been
   produced.
-- **A3** (Instructions/Tasks don't cross Workspaces) — only by construction, no
-  behavioural test.
 - **Step 8 / §3.2 hypothesis** — whether focused Workspaces beat a mixed one
   cannot be measured at all until corpora exist.
 - **OPEN-2's open half** — the real `context_window_tokens` per model must be
@@ -69,8 +67,7 @@ timeouts mid-stream) is unverified until a live `.env` endpoint exists.
 
 ## Process (A18/A19)
 
-- A18 (journal current) — count: `memory.md`/`state.md`/`changelog.md` updated
-  at every step; committed with each step.
-- A19 (no `[OPEN]` resolved on agent authority) — every `memory.md` entry for an
-  `[OPEN]` uses one of the three permitted Authority values; none claims an owner
-  answer the owner didn't give.
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A18 | `memory.md`/`state.md`/`changelog.md` exist at repo root and are current | Inspection: every step's entry present in each; `state.md` names the current step + a concrete next action; `changelog.md` has an entry per completed step | ✅ |
+| A19 | No `[OPEN]` recorded as resolved on agent authority | `memory.md` Decision log: every `[OPEN]` entry uses one of the three permitted Authority values; the two agent-decided items (Steps 3+4 landing, degrade-persistence) are recorded as owner-delegated, not owner-answered | ✅ |

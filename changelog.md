@@ -7,6 +7,32 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Post-Step-7 follow-ups (acceptance matrix completeness)
+
+No build-order step; corrections/tightening after the final sign-off.
+
+**Added**
+- `test_multi_workspace.py::test_a3_instructions_and_tasks_do_not_leak` — a
+  REAL behavioural test for A3 (was the matrix's weakest "by construction"
+  entry): create Workspace B with its own Instructions + a Task, switch to B,
+  assert B's task row shows only B's Task (A's `/summarize-policy`/
+  `/find-procedure` absent), and that `_load_workspace(B)` carries B's
+  instructions (not A's). 55 → 56 passed.
+- `ACCEPTANCE_MATRIX.md` — A3 row now points at that test (removed from the
+  not-verifiable list); A18/A19 added as an explicit process table.
+
+**Modified**
+- `memory.md` — discovery entry recording that OPEN-13 was missing only from my
+  owner summary, not from SPEC §11 or the Decision log.
+
+**Schema and migration changes**
+- None.
+
+**Known-broken / deferred**
+- Step 8 only, as before.
+
+---
+
 ## 2026-09-11 — Step 7 — Cleanup (§7.6, §7.7, §7.8)
 
 The final implementable build-order step. Everything an agent can finish without

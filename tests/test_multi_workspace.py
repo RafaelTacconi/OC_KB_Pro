@@ -157,3 +157,74 @@ def test_a6_branding_uses_workspace_name(monkeypatch, tmp_path):
     # We assert the sidebar brand markdown includes the seeded name.
     combined = " ".join(m.value for m in at.markdown)
     assert "AML Workspace" in combined
+
+
+def test_a3_instructions_and_tasks_do_not_leak(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A3 — Instructions and Tasks configured in Workspace A do not appear or
+    apply in Workspace B. The two leaks would be: B's chat listing A's Tasks,
+    and B's prompt using A's Instructions."""
+    import sqlite3
+    import uuid
+    from datetime import datetime, timezone
+
+    monkeypatch.chdir(tmp_path)
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Create Workspace B with its OWN instructions and a Task, and a set of
+    # Tasks in A (seeded) — B must not inherit A's.
+    at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()
+    assert not at.exception
+    at.sidebar.text_input(key="new_workspace_name").set_value("HR Workspace")
+    at.sidebar.text_area(key="new_workspace_instructions").set_value(
+        "HR-specific rule: always mention the people team."
+    )
+    at.sidebar.button(key="new_workspace_submit").click().run()
+    assert not at.exception
+
+    db_path = tmp_path / "data" / "workspace_app.db"
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        ws_b = dict(conn.execute(
+            "SELECT workspace_id FROM workspaces WHERE name = 'HR Workspace'"
+        ).fetchone())
+        ws_b_id = ws_b["workspace_id"]
+        # Give B its own task.
+        conn.execute(
+            "INSERT INTO tasks (task_id, workspace_id, name, description, prompt, input_label, created_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (uuid.uuid4().hex, ws_b_id, "/hr-task", "HR specific", "HR prompt", "input", now),
+        )
+        # Confirm A's tasks exist (seeded: /summarize-policy, /find-procedure).
+        ws_a_tasks = [dict(r) for r in conn.execute(
+            "SELECT name FROM tasks WHERE workspace_id = 'aml-workspace'"
+        )]
+        conn.commit()
+    finally:
+        conn.close()
+    assert "/summarize-policy" in {t["name"] for t in ws_a_tasks}
+
+    # Switch to B (owner).
+    ws_selectbox = _workspace_selectbox(at)
+    ws_selectbox.set_value(ws_b_id).run()
+    assert not at.exception
+
+    # B's chat task row shows ONLY B's task — A's seeded tasks must not appear.
+    task_buttons = [b for b in at.button if b.key and b.key.startswith("task_btn_")]
+    assert task_buttons, "expected at least B's task button"
+    task_labels = [b.label for b in task_buttons]
+    assert "/hr-task" in task_labels
+    assert "/summarize-policy" not in task_labels
+    assert "/find-procedure" not in task_labels
+
+    # B's prompt uses B's Instructions, not A's. _run_turn loads the workspace
+    # by id; assert the loaded workspace instructions are B's.
+    from ui.chat_view import _load_workspace
+
+    b_ws = _load_workspace(ws_b_id)
+    assert "people team" in b_ws.get("instructions", "")
+    a_ws = _load_workspace("aml-workspace")
+    assert "people team" not in a_ws.get("instructions", "")

@@ -102,10 +102,11 @@ wrong — `fits_in_context()` uses it.
 
 ```
 python -m pytest tests/ -q
-55 passed in 20.92s   (2026-09-11)
+56 passed in 22.59s   (2026-09-11)
 ```
-Also verified from a **clean clone** (fresh venv, fresh install): 55 passed.
-No `data/` is ever written into the repo root (conftest guard).
+Also verified from a **clean clone** (fresh venv, fresh install): 55 passed at
+`a9d033c`; the +1 (A3 behavioural test) landed after. No `data/` is ever written
+into the repo root (conftest guard).
 
 ## Next action
 
