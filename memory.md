@@ -203,6 +203,17 @@ way. **Step 6 (visibility) should decide whether to record the degrade on the me
 e.g. a marker in the message or a `degraded` column — rather than relying on the
 session-only note. Not built now; the spec (§7.3) requires only the visible note.
 
+### 2026-09-11 — DECIDED: degraded answers are NOT persisted with a marker — supersedes the note above
+Step 6 reached the deferred decision. **Decision: do not record the degrade on the message.**
+Reasons: (1) SPEC §7.3 requires only the visible note, and nothing in §5–§6 or the acceptance
+criteria requires persistence; (2) persisting it needs either a new `degraded` column on
+`chat_messages` (a schema change + migration beyond the spec, touching Step 3's migration
+contract) or a marker baked into the assistant content (which would pollute the message text
+and, under OPEN-3 Option B, the model's own context); (3) the visible `wa_semantic_degraded`
+note already surfaces on the turn where it matters. The current-turn note is the correct
+scope. Authority: agent's decision (owner delegated; recorded 2026-09-11). If history-level
+review of degraded answers is ever wanted, revisit with a real column.
+
 ### 2026-09-11 — openai SDK v3 API surface (Step 2b)
 The installed `openai` SDK is v3.x. The adapter path is
 `OpenAI(base_url=..., api_key=...)` then `client.chat.completions.create(model=slug, messages=[...])`,
@@ -211,6 +222,16 @@ adapter call (lazy, per §14.2); the "unconfigured" guard raises `RuntimeError` 
 is imported, so a missing `.env` never triggers a network/import side effect (validated —
 the fail-fast happens pre-`openai` import). The SDK does not fetch anything at `OpenAI(...)`
 construction; errors surface at the `.create()` call.
+
+### 2026-09-11 — A keyed Streamlit widget retains its value and fights a programmatic reset — use a generation counter
+The Workspace switcher selectbox (Step 5) is keyed by user + a generation counter
+(`wa_workspace_selectbox_{user}_{gen}`). Without the counter, after `create_workspace()` sets
+`wa_workspace_id` to a NEW Workspace and reruns, the keyed selectbox keeps its previous value,
+so `selected_ws != current_ws` and the widget silently fights the programmatic intent — the
+new Workspace never becomes selected (A1), and a stale value would have to be force-reset. A
+manually-changed selection or a create bumps `wa_ws_gen`, making Streamlit treat the widget as
+new and re-initialize from `index`. This is the fix for the Step-5 item-2 double-answer trap
+(§5.2.1). The counter is intentional, not cruft — do not "simplify" it into a bare key.
 
 ---
 

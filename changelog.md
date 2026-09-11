@@ -7,6 +7,43 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Step 6 — Visibility (§5.2.4 grounding + §7.5 model attribution)
+
+**Modified**
+- `ui/chat_view.py`:
+  - `_grounding_summary(workspace_id)` — single count query returning (indexed,
+    failed) for the Workspace. INDEXED sources only (Step-6 item 2): counting
+    all rows would tell a Member the Workspace has knowledge when every
+    ingestion failed.
+  - Grounding status in the chat header for ALL users (§5.2.4): 0 indexed →
+    visible warning (A17); >0 → neutral caption "N sources indexed"; failed
+    Sources → Owners only, a note pointing at Manage → Knowledge.
+  - `_model_display_name(model_id)` + history renderer shows "Model: …" on
+    assistant messages (§7.5). Falls back to the raw `model_id` when
+    `get_model_spec` raises ValueError — since Step 2b a model can vanish from
+    the picker just by blanking a `.env` slug, while historical rows keep that
+    id; showing the raw id preserves provenance (Step-6 item 1).
+
+**Added**
+- `tests/test_grounding_and_attribution.py` (5 tests) — run AS A MEMBER to
+  catch the Member-path-renders-nothing failure mode (Step-6 item 3): A17 (0
+  indexed → Member sees the warning), indexed-count caption shown to a Member,
+  failed-notes Owner-only (Member still sees the count), §7.5 display-name
+  attribution, and unknown-id → raw-id fallback.
+
+**Schema and migration changes**
+- None.
+
+**Acceptance criteria satisfied**
+- A17. (A15 already covered §7.3's degrade note; attribution is §7.5.)
+
+**Known-broken / deferred**
+- Deferred decision from Step 2 (degrade persistence) is now RESOLVED: degraded
+  answers are NOT persisted with a marker; reasons in `memory.md` (agent
+  decision, owner delegated). The visible per-turn note is the scope.
+
+---
+
 ## 2026-09-11 — Step 5 — Multi-Workspace (SPEC.md §5)
 
 Multiple Workspaces per Owner, as specified in §3.1 (the data model already
