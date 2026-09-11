@@ -109,6 +109,29 @@ regression guard for `SPEC.md` §7.2; `tests/test_spec_v3_regressions.py` is.
 stateless, so conversation length has no effect on prompt size or context-window usage. This is
 what makes OPEN-3 a real decision rather than a formality.
 
+### 2026-09-11 — The app is testable end-to-end via streamlit.testing.v1.AppTest
+`AppTest.from_file("app.py").run()` executes the real app headlessly — `st.chat_input`,
+`st.error`, `st.button(key=...)` and `st.rerun()` (auto-followed) behave as in a real session.
+Relative DB paths resolve against the process cwd, so `monkeypatch.chdir(tmp_path)` gives full
+DB isolation. `at.error` exposes `st.error` bubble text. The endpoint stub's
+`NotImplementedError` is reached only when `INTERNAL_API_KEY` is set — otherwise
+`_call_internal_gateway()` raises `RuntimeError` first — so set it in tests to match A12's
+wording. Used by `tests/test_chat_error_handling.py` (Step 1).
+
+### 2026-09-11 — requirements install: unstructured DID install cleanly here
+The `unstructured[pdf,docx]>=0.15` extra installed without failure in `.venv` (torch 2.14,
+sentence-transformers 6.0.1, streamlit 1.63.0, pytest 9.1.1). The sandbox also has a route to
+huggingface.co — `all-MiniLM-L6-v2` downloaded and loaded during the Step 1 A12/A13
+verification, so ingestion would not be expected to fail for network reasons here. Both
+speculative failure modes (`unstructured` not installing; no HF route) did not apply.
+
+### 2026-09-11 — The `break` bug's required test and the budget test coexist under `continue`
+`test_oversized_chunk_does_not_discard_smaller_relevant_chunks` (A14) and
+`test_build_prompt_respects_token_budget` both pass under `continue` — the former because the
+two small chunks fit the 3000-token budget after the oversized one is skipped, the latter
+because its two 2600-token chunks are each too big to coexist. Both were green in the 8-pass
+run after the §7.2 one-liner.
+
 ---
 
 ## Rejected approaches
@@ -119,5 +142,20 @@ what makes OPEN-3 a real decision rather than a formality.
 
 ## Deviations from the spec
 
-*(none yet — anything built differently from `SPEC.md`, with the reason. If the spec is wrong
-or unimplementable, say so here and in the final report. Do not diverge quietly.)*
+### 2026-09-11 — §7.1 chats-row creation deferred to Step 4
+SPEC §7.1 requirement 1 says the user-message persist step should also "create the `chats`
+row here too if the Chat is new (§6.2)". The `chats` table does not exist until Step 3's
+schema migration (§4.2), and multi-Chat wiring is Step 4. Deferred: in this build the whole
+`chats` concept is absent, so there is no row to create. Revisit when Step 4 lands.
+**Spec change needed (minor):** none — this is a build-order consequence already signalled by
+`state.md`.
+
+### 2026-09-11 — A failed turn leaves a persisted user message with no answer and no retry once the session ends
+Retry state lives only in `st.session_state["wa_pending_error"]`, so if the client closes the
+tab the turn is permanently user-message-only, with no answer and a retry affordance that is
+gone. This is a direct consequence of applying §7.1 exactly (do not persist an assistant
+message containing the error, or it would pollute the Chat and, under Option B, the model's
+own context). Not changed for Step 1; flagged for the project owner if longer-lived retry
+(an assistant placeholder row, or re-running by sending the same text again) is wanted.
+
+---

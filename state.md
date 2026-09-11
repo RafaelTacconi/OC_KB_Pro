@@ -3,21 +3,22 @@
 Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13.3.
 History belongs in `changelog.md`, not here.
 
-**Last updated:** 2026-09-11 — Step 1 started.
+**Last updated:** 2026-09-11 — Step 1 complete.
 
 ---
 
 ## Current step
 
-**Step 1 — unblock the app (in progress).** Fix §7.2 (`break` → `continue` in
-`prompting/assemble.py`) and §7.1 (error handling + message persistence in
-`ui/chat_view.py::_answer()`). Both are self-contained defect fixes.
+**Step 2 — resilience (next).** Fix §7.3 (lexical degrade path in
+`retrieval/hybrid_search.py::hybrid_search()`) and §7.4 (delete confirmations in
+`ui/owner_view.py`). Both are self-contained defect fixes that depend on no
+`[OPEN]` item.
 
 ## Progress
 
 | Step | Description | Status |
 |---|---|---|
-| 1 | Unblock the app — fix §7.2 (`break` → `continue` + test) and §7.1 (error handling, message persistence) | In progress |
+| 1 | Unblock the app — fix §7.2 (`break` → `continue` + test) and §7.1 (error handling, message persistence) | **Done** |
 | 2 | Resilience — §7.3 lexical degrade path, §7.4 delete confirmations | Not started |
 | 3 | Schema — `chats` table, `chat_messages.chat_id`, indexes, `migrate_db()` | Not started |
 | 4 | Multi-Chat — history by `chat_id`, new chat, chat selector, titling | Not started |
@@ -28,30 +29,36 @@ History belongs in `changelog.md`, not here.
 
 ## Blocked on
 
-Nothing blocks Step 1: §7.1 and §7.2 depend on no `[OPEN]` item.
+Nothing blocks Step 2.
 
-Note: §7.1's "create the `chats` row here too if the Chat is new (§6.2)" is
-deferred to Step 4 — the `chats` table does not exist until Step 3's schema
-migration. Noted under deviations in `memory.md`.
+Pre-existing note (open since Step 1): §7.1's "create the `chats` row here too
+if the Chat is new" is deferred to Step 4 — the `chats` table does not exist
+until Step 3. See `memory.md` deviations.
+
+**OPEN-3** (does chat history enter the prompt?) blocks nothing before Step 4,
+but answering it early would avoid rework: the interim build is Option A, and
+switching to Option B afterwards touches `build_prompt()`, the token budget,
+and possibly the retrieval query.
 
 ## Test status
 
-Baseline before any edit:
-
 ```
 python -m pytest tests/ -q
-1 failed, 7 passed
+9 passed in 9.09s
 ```
-`tests/test_spec_v3_regressions.py::test_oversized_chunk_does_not_discard_smaller_relevant_chunks`
-fails on purpose (A14). It must pass when Step 1 finishes.
-Test-suite rerun pending after edits — see changelog/commit.
+Run on 2026-09-11 after completing Step 1 (previously 7 passed, 1 failed —
+the intentional A14 failure is now green, and `tests/test_chat_error_handling.py`
+added A12/A13 coverage).
 
 ## Next action
 
-In `prompting/assemble.py`, change `break` to `continue` in the retrieved-chunk
-loop (line ~52), then run `python -m pytest tests/ -q` and confirm **8 passed**.
-Then implement §7.1 in `ui/chat_view.py::_answer()`: persist the user message
-first, split the turn into a Streamlit-free `_run_turn()`, wrap in try/except,
-stash the failure in `st.session_state["wa_pending_error"]`, render an inline
-assistant error bubble with a Retry button after history, and verify A12/A13
-headlessly via `streamlit.testing.v1.AppTest`.
+Start Step 2. In `retrieval/hybrid_search.py::hybrid_search()`, wrap the
+`semantic_search()` call in `try/except Exception`; on failure return lexical
+results only and signal degradation without importing Streamlit — the §7.3
+specified signal is "communicate it through a return value or a documented
+exception-free signal", so plan a return-shape change (the remaining spec
+detail to settle: whether `_answer` and `_run_turn` in `ui/chat_view.py` expect
+the new shape — read `hybrid_search` callers before choosing). Then add the
+§7.4 two-step confirm in `ui/owner_view.py` for Source and Task deletion with a
+session-state flag keyed by entity id. Run `python -m pytest tests/ -q` before
+and after.
