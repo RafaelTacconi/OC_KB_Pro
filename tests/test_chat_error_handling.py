@@ -2,22 +2,24 @@
 test_chat_error_handling.py — acceptance criteria A12 / A13 (SPEC.md §10).
 
 Runs the real app headlessly via streamlit.testing.v1.AppTest and exercises a
-full chat turn with the model stub still failing (SPEC.md §7.1):
+full chat turn whose model call is FORCED to fail (SPEC.md §7.1):
 
-  A12 — sending a message with `_call_internal_gateway()` raising
-        NotImplementedError renders an inline error inside the conversation,
-        keeps the page alive (no exception reaches the error screen), and
-        persists the user's message, which is still visible after a rerun.
+  A12 — sending a message, with the model call raising, renders an inline error
+        inside the conversation, keeps the page alive (no exception reaches the
+        error screen), and persists the user's message, which is still visible
+        after a rerun.
   A13 — Retry after a failure produces exactly one additional model attempt
         and does not duplicate the user's message.
 
+The failure is injected by monkeypatching `call_model` to raise. This makes the
+test independent of `models/router.py::_call_internal_gateway()`'s current
+NotImplementedError stub: when a real internal gateway is wired in, the test
+still measures the §7.1 error path without depending on the live endpoint.
+
 The test is deliberately hermetic: it runs in a temp working directory so the
-SQLite DB is created there, and it forces the Hugging Face hub offline so the
-embedding model cannot be downloaded mid-test. Whether the embedder was
-already cached (retrieval succeeds, then the stub model call fails) or not
-(retrieval itself fails) the assertion targets are the same: the failure is
-contained, the user message persists exactly once, and Retry does not
-duplicate it.
+SQLite DB is created there (`db.DB_PATH` is a relative path, resolved against
+the process cwd at connect time — not a bind-at-import), and it forces the
+Hugging Face hub offline so no embedding model is downloaded mid-test.
 """
 
 from __future__ import annotations
@@ -28,6 +30,8 @@ from pathlib import Path
 
 import pytest
 from streamlit.testing.v1 import AppTest
+
+import ui.chat_view
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,7 +55,13 @@ def _count_by_role(rows: list[dict], role: str) -> int:
 def test_failed_turn_persists_question_and_retry_does_not_duplicate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    os.environ["INTERNAL_API_KEY"] = "test-key-for-stub"  # so the stub reaches NotImplementedError
+    attempts: list[str] = []
+
+    def _failing_call_model(prompt: str, model_id: str) -> str:
+        attempts.append(model_id)
+        raise RuntimeError("forced model failure for §7.1 test")
+
+    monkeypatch.setattr(ui.chat_view, "call_model", _failing_call_model)
     os.environ["HF_HUB_OFFLINE"] = "1"
     monkeypatch.chdir(tmp_path)
 
@@ -62,6 +72,7 @@ def test_failed_turn_persists_question_and_retry_does_not_duplicate(
 
     # --- Send a message (A12) -------------------------------------------------
     at.chat_input[0].set_value(question).run()
+    assert len(attempts) == 1  # the forced failure happened exactly once
 
     # Page is alive: nothing escaped the §7.1 handler to the error screen.
     assert not at.exception
@@ -81,8 +92,10 @@ def test_failed_turn_persists_question_and_retry_does_not_duplicate(
     retry.click().run()
 
     assert not at.exception
+    # Exactly ONE additional model attempt — Retry must not re-persist or re-attempt twice.
+    assert len(attempts) == 2
     rows = _db_rows(db_path)
     # Exactly one user row for this turn still — Retry must not re-persist it.
     assert _count_by_role(rows, "user") == 1
-    # The stub still fails, so no assistant message is persisted.
+    # Still failing, so no assistant message is persisted.
     assert _count_by_role(rows, "assistant") == 0
