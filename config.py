@@ -26,8 +26,18 @@ TEST_USERS = [
     {"user_id": "u_member2", "display_name": "Sam (Member)", "role": "member"},
 ]
 
+# DEFAULT_WORKSPACE_ID is the SEEDED EXAMPLE Workspace (created by
+# seed_default_workspace), not "the only Workspace". Multiple Workspaces are
+# supported (SPEC §5); the offline eval harness and first-run experience rely
+# on this one existing (SPEC §5.1).
 DEFAULT_WORKSPACE_ID = "aml-workspace"
 DEFAULT_WORKSPACE_NAME = "AML Workspace"
+
+# Product-level title used by st.set_page_config (SPEC §5.2.3). The browser
+# tab title can't track the selected Workspace (set_page_config runs before a
+# Workspace is known), so this is a neutral constant; render_brand() is the
+# dynamic per-Workspace bit.
+APP_TITLE = "AI Workspace"
 
 # Two hardcoded example tasks to prove the "/" mechanism (spec: 2-3 tasks, Section 4.2).
 SEED_TASKS = [
@@ -129,6 +139,36 @@ def seed_default_workspace() -> None:
                     now,
                 ),
             )
+
+
+def create_workspace(name: str, instructions: str, owner_user_id: str) -> str:
+    """
+    Create a Workspace owned by `owner_user_id`. Per SPEC §5.3 interim, EVERY
+    entry in TEST_USERS is added as a member — mirroring the seed behaviour
+    (OPEN-4 interim; an Owner cannot create a private Workspace). Returns the
+    new workspace_id.
+    """
+    workspace_id = uuid.uuid4().hex
+    now = _now()
+    with transaction() as conn:
+        conn.execute(
+            """
+            INSERT INTO workspaces
+                (workspace_id, name, owner_user_id, instructions, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (workspace_id, name, owner_user_id, instructions, now, now),
+        )
+        for user in TEST_USERS:
+            conn.execute(
+                """
+                INSERT INTO workspace_members (workspace_id, user_id)
+                VALUES (?, ?)
+                ON CONFLICT DO NOTHING
+                """,
+                (workspace_id, user["user_id"]),
+            )
+    return workspace_id
 
 
 def bootstrap() -> None:

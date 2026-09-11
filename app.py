@@ -18,7 +18,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from config import DEFAULT_WORKSPACE_ID, TEST_USERS, bootstrap
+from config import APP_TITLE, DEFAULT_WORKSPACE_ID, TEST_USERS, bootstrap, create_workspace
 from models.credentials import api_key_status
 from ui.chat_view import render_chat_view
 from ui.owner_view import render_owner_view
@@ -26,13 +26,13 @@ from ui.pills import pill, render as render_pill
 from ui.theme import inject_tokens, page_icon_path, render_brand
 
 st.set_page_config(
-    page_title="AML Workspace",
+    page_title=APP_TITLE,  # product-level constant — a Workspace isn't known yet (§5.2.3)
     layout="wide",
     page_icon=page_icon_path(),
     initial_sidebar_state="expanded",
 )
 
-bootstrap()  # idempotent: init_db + seed_users + seed_default_workspace
+bootstrap()  # idempotent: init_db + migrate + seed_users + seed_default_workspace
 
 inject_tokens()
 
@@ -41,9 +41,127 @@ ROLE_PILL_MAP = {
     "member": ("gray", "\u25cf"),   # ●
 }
 
-with st.sidebar:
-    render_brand("AML Workspace", "AI Workspace")
 
+def _load_visible_workspaces(user_id: str) -> list[dict]:
+    """A user's Workspaces, derived from workspace_members (SPEC §5.3) — never
+    from `workspaces` directly, so access control is enforced in one place."""
+    from db import get_connection
+
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT w.* FROM workspaces w
+            JOIN workspace_members wm ON wm.workspace_id = w.workspace_id
+            WHERE wm.user_id = ?
+            ORDER BY w.name
+            """,
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def _resolve_workspace(visible: list[dict]) -> str | None:
+    """
+    Returns the active workspace_id, defaulting to the first visible one on
+    startup or when the stored id is no longer visible to the current user
+    (§5.2.1 user-switch re-evaluation). Returns None only if the user sees
+    no Workspaces at all.
+    """
+    current = st.session_state.get("wa_workspace_id")
+    if current is not None and any(w["workspace_id"] == current for w in visible):
+        return current
+    if visible:
+        st.session_state["wa_workspace_id"] = visible[0]["workspace_id"]
+        return visible[0]["workspace_id"]
+    return None
+
+
+def _render_workspace_switcher(current_user: dict) -> str | None:
+    """
+    §5.2.1 — the Workspace switcher, below the user selectbox and above
+    navigation. Selection persists in wa_workspace_id. Switching clears the
+    old Workspace's selected task and the active Chat (wa_chat_id), then
+    reruns.
+
+    The selectbox is keyed by user_id AND a generation counter (wa_ws_gen):
+    bumping the counter (on create / programmatic switch) makes Streamlit
+    treat it as a NEW widget that re-initializes from `index` — so a newly
+    created Workspace actually becomes selected (A1) instead of the widget
+    retaining a stale value that fights wa_workspace_id (the Step-5 item-2
+    double-answer trap). A manual selection change also bumps the counter.
+    """
+    visible = _load_visible_workspaces(current_user["user_id"])
+    if not visible:
+        return None
+    labels = {w["workspace_id"]: w["name"] for w in visible}
+    options = [w["workspace_id"] for w in visible]
+    current_ws = _resolve_workspace(visible)
+    if current_ws is None:
+        current_ws = options[0]
+
+    st.markdown('<div class="wa-eyebrow">Workspace</div>', unsafe_allow_html=True)
+    gen = st.session_state.setdefault("wa_ws_gen", 0)
+    selected_ws = st.selectbox(
+        "Workspace",
+        options=options,
+        format_func=lambda wid: labels[wid],
+        index=options.index(current_ws),
+        key=f"wa_workspace_selectbox_{current_user['user_id']}_{gen}",
+    )
+    if selected_ws != current_ws:
+        # User (or a fresh widget) selected a different Workspace. Clear the
+        # old Workspace's Task selection and the active Chat so no state leaks
+        # across the switch (SPEC §5.2.1), then adopt it and refresh the widget.
+        st.session_state.pop(f"selected_task_{current_ws}", None)
+        st.session_state.pop("wa_chat_id", None)
+        st.session_state["wa_workspace_id"] = selected_ws
+        st.session_state["wa_ws_gen"] = gen + 1
+        st.rerun()
+    return selected_ws
+
+
+def _render_new_workspace(current_user: dict) -> None:
+    """§5.2.2 — Owner-only "+ New Workspace" expander. Name (required) +
+    Instructions (optional). Nothing else. Empty names rejected inline."""
+    if current_user["role"] != "owner":
+        return
+    with st.expander("+ New Workspace"):
+        with st.form(key="new_workspace_form"):
+            ws_name = st.text_input(
+                "Name",
+                placeholder="e.g. AML, HR, Procurement",
+                key="new_workspace_name",
+            )
+            ws_instructions = st.text_area(
+                "Instructions",
+                height=120,
+                key="new_workspace_instructions",
+            )
+            created = st.form_submit_button(
+                "Create workspace",
+                type="primary",
+                key="new_workspace_submit",
+            )
+        if created:
+            if not ws_name.strip():
+                st.warning("Workspace name cannot be empty.")
+            else:
+                new_id = create_workspace(
+                    ws_name.strip(), ws_instructions, current_user["user_id"]
+                )
+                st.session_state["wa_workspace_id"] = new_id
+                st.session_state.pop("wa_chat_id", None)
+                # Bump the switcher generation so the new Workspace is
+                # actually selected (A1) rather than the widget retaining its
+                # old value.
+                st.session_state["wa_ws_gen"] = st.session_state.get("wa_ws_gen", 0) + 1
+                st.rerun()
+
+
+with st.sidebar:
     st.markdown('<div class="wa-eyebrow">Signed in as</div>', unsafe_allow_html=True)
     user_labels = {u["user_id"]: u["display_name"] for u in TEST_USERS}
     selected_user_id = st.selectbox(
@@ -57,6 +175,19 @@ with st.sidebar:
         "Owner": ROLE_PILL_MAP["owner"],
         "Member": ROLE_PILL_MAP["member"],
     }))
+
+    # --- Workspace switcher (SPEC §5.2.1) ----------------------------------
+    current_ws = _render_workspace_switcher(current_user)
+
+    # --- Branding (SPEC §5.2.3): dynamic per-Workspace name. ---------------
+    if current_ws is not None:
+        ws_row = next(
+            (w for w in _load_visible_workspaces(current_user["user_id"])
+             if w["workspace_id"] == current_ws), {}
+        )
+        render_brand(ws_row.get("name", "Workspace"), APP_TITLE)
+    else:
+        render_brand("AI Workspace", APP_TITLE)
 
     # --- API key expiry (SPEC §14.5) ----------------------------------------
     # Informational only, evaluated once per render. Never blocks anything.
@@ -81,6 +212,9 @@ with st.sidebar:
             {"unknown": ("gray", "\u25cf")},
         ))
         st.caption("Set OPENAI_API_KEY_EXPIRES_ON to get advance warning.")
+
+    # --- New Workspace (Owner only, SPEC §5.2.2) ---------------------------
+    _render_new_workspace(current_user)
 
     st.divider()
 
@@ -113,7 +247,7 @@ with st.sidebar:
         if readme_path.exists():
             st.caption("Full project notes are in this app's README.md.")
 
-workspace_id = DEFAULT_WORKSPACE_ID  # PoC: single fixed Workspace (Section 4.1)
+workspace_id = current_ws if current_ws is not None else DEFAULT_WORKSPACE_ID
 
 if st.session_state["wa_nav"] == "Manage" and current_user["role"] == "owner":
     render_owner_view(workspace_id)
