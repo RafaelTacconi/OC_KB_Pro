@@ -97,8 +97,11 @@ def test_a17_member_sees_warning_when_zero_indexed(monkeypatch, tmp_path):
     # Switch to a member on a fresh (empty) workspace.
     _switch_to_member(at)
     assert not at.exception
+    # The grounded-knowledge gap is shown to everyone as a GREY note
+    # (UI review: grey not yellow) rendered via st.markdown/pill, not
+    # st.warning. A17 requires the Member to SEE it.
     assert any(
-        "no indexed knowledge yet" in w.value for w in at.warning
+        "No indexed knowledge yet" in (m.value or "") for m in at.markdown
     )
 
 
@@ -111,8 +114,10 @@ def test_grounding_caption_shows_count_to_member_when_indexed(monkeypatch, tmp_p
     _switch_to_member(at)
     assert not at.exception
     assert any("1 source indexed." in c.value for c in at.caption)
-    # And the no-knowledge warning is gone.
-    assert not any("no indexed knowledge yet" in w.value for w in at.warning)
+    # UI review item 4: the MEMBER sees WHICH file is indexed, not just a count.
+    assert any("Indexed files: indexed.pdf" in c.value for c in at.caption)
+    # And the no-knowledge gap note is gone (it is html-markdown now).
+    assert not any("No indexed knowledge yet" in (m.value or "") for m in at.markdown)
 
 
 def test_failed_sources_note_is_owner_only(monkeypatch, tmp_path):

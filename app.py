@@ -110,6 +110,9 @@ def _render_workspace_switcher(current_user: dict) -> str | None:
         format_func=lambda wid: labels[wid],
         index=options.index(current_ws),
         key=f"wa_workspace_selectbox_{current_user['user_id']}_{gen}",
+        # The "Workspace" eyebrow above is the label; don't duplicate it on the
+        # widget itself (UI review item 1).
+        label_visibility="collapsed",
     )
     if selected_ws != current_ws:
         # User (or a fresh widget) selected a different Workspace. Clear the
@@ -179,7 +182,11 @@ with st.sidebar:
     # --- Workspace switcher (SPEC §5.2.1) ----------------------------------
     current_ws = _render_workspace_switcher(current_user)
 
-    # --- Branding (SPEC §5.2.3): dynamic per-Workspace name. ---------------
+    # --- Branding (SPEC §5.2.3): dynamic per-Workspace name. A divider keeps
+    # it visually apart from the selected-Workspace control above so the
+    # product label and the working Workspace don't read as one block
+    # (UI review item 2).
+    st.divider()
     if current_ws is not None:
         ws_row = next(
             (w for w in _load_visible_workspaces(current_user["user_id"])
@@ -192,25 +199,25 @@ with st.sidebar:
     # --- API key expiry (SPEC §14.5) ----------------------------------------
     # Informational only, evaluated once per render. Never blocks anything.
     # OPEN-12 interim: expiring/unknown -> Owners only; expired -> everyone.
+    # NOTE: pill(value, class_map) looks up class_map BY THE FORMATTED VALUE, so
+    # the map key must be the exact displayed string, not the status name
+    # (audit finding; the previous code keyed on "expired"/"expiring" which
+    # never matched and silently fell back to grey).
     _key_status = api_key_status()
     if _key_status.state == "expired":
-        render_pill(pill(
-            f"API key expired on {_key_status.expires_on}",
-            {"expired": ("red", "\u2715")},
-        ))
+        _exp_str = f"API key expired on {_key_status.expires_on}"
+        render_pill(pill(_exp_str, {_exp_str: ("red", "\u2715")}))
         st.caption("Answer calls will fail until the API key is renewed.")
     elif _key_status.state == "expiring" and current_user["role"] == "owner":
-        render_pill(pill(
+        _exp_str = (
             f"API key expires {_key_status.expires_on} "
-            f"({_key_status.days_remaining}d)",
-            {"expiring": ("orange", "\u26a0")},
-        ))
+            f"({_key_status.days_remaining}d)"
+        )
+        render_pill(pill(_exp_str, {_exp_str: ("orange", "\u26a0")}))
         st.caption("Renew the API key in .env before it expires.")
     elif _key_status.state == "unknown" and current_user["role"] == "owner":
-        render_pill(pill(
-            "No API key expiry date set",
-            {"unknown": ("gray", "\u25cf")},
-        ))
+        _exp_str = "No API key expiry date set"
+        render_pill(pill(_exp_str, {_exp_str: ("gray", "\u25cf")}))
         st.caption("Set OPENAI_API_KEY_EXPIRES_ON to get advance warning.")
 
     # --- New Workspace (Owner only, SPEC §5.2.2) ---------------------------

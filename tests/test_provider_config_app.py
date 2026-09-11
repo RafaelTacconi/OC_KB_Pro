@@ -124,9 +124,13 @@ def test_a21_picker_filters_and_falls_back_to_first_configured(
     assert not any("No AI model is configured" in w.value for w in at.warning)
 
     mid = at.selectbox(key="model_picker_aml-workspace")
-    # selectbox options are the display_names (the picker's format_func); the
-    # two configured models appear, the blank-slug one does not (A21).
-    assert mid.options == ["Fast (low latency)", "Reasoning (slower, more thorough)"]
+    # The picker labels include the read-only .env slug (SPEC §14.3 note,
+    # owner-approved): "display_name (slug)". The two configured models appear,
+    # the blank-slug one does not (A21).
+    assert mid.options == [
+        "Fast (low latency) (fast-real)",
+        "Reasoning (slower, more thorough) (reason-real)",
+    ]
     # value is the raw model_id; fallback from the unconfigured
     # DEFAULT_MODEL_ID to the first configured model.
     assert mid.value == "internal-fast"

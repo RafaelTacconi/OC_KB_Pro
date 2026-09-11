@@ -777,6 +777,7 @@ The distinction: **`.env` holds what changes between deployments; the registry h
 **Resolution rules:**
 
 - A `ModelSpec` whose env slug is empty or unset is **omitted from the picker entirely.** Do not show a model that cannot be called.
+- **The picker MAY surface each model's `.env` slug as read-only secondary context** (e.g. "Standard (openai/gpt-4o)"), so the user can see which real model answers. This does not break the split: the registry's `display_name` remains the source of the human label, `.env` remains the source of the slug, and the picker only *displays* the env value by reading it via `provider_model_name()`.
 - If `DEFAULT_MODEL_ID`'s slug is not configured, fall back to the first configured model. `_render_model_picker()` currently does `[m.model_id for m in models].index(DEFAULT_MODEL_ID)`, which raises `ValueError` if the default is absent — that path must not crash.
 - If **no** model is configured, the picker renders nothing and the chat surface shows a clear message that no model is configured, naming `.env` as the place to fix it. The app stays up; Manage and ingestion continue to work.
 - The `context_window_tokens` value of 256,000 in the registry is **still an assumption** carried from the original note. Once real slugs are known, confirm the real window for each and correct the registry — `fits_in_context()` guards against overflow using that number, so a wrong figure means a wrong guard. This updates, and does not close, `[OPEN-2]`.

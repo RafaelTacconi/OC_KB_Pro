@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from db import transaction
-from models.registry import DEFAULT_MODEL_ID, get_model_spec, list_models
+from models.registry import DEFAULT_MODEL_ID, get_model_spec, list_models, provider_model_name
 from models.router import call_model
 from prompting.assemble import build_prompt
 from retrieval.hybrid_search import hybrid_search
@@ -62,28 +62,29 @@ def _load_workspace(workspace_id: str) -> dict:
         conn.close()
 
 
-def _grounding_summary(workspace_id: str) -> tuple[int, int]:
+def _grounding_summary(workspace_id: str) -> tuple[int, int, list[str]]:
     """
-    SPEC §5.2.4 — count of INDEXED Sources and of FAILED Sources for this
-    Workspace. Single count query. Indexed-only matters: counting all rows
-    would tell a Member the Workspace has knowledge when every ingestion
-    failed (Step-6 item 2).
+    SPEC §5.2.4 — for this Workspace: count of INDEXED Sources, count of FAILED
+    Sources, and the display_names of the indexed Sources. Single query.
+    Indexed-only matters: counting all rows would tell a Member the Workspace
+    has knowledge when every ingestion failed (Step-6 item 2). The file names
+    are shown to EVERY user so Members know exactly what they are asking
+    against (UI review item 4), not just a count.
     """
     from db import get_connection
 
     conn = get_connection()
     try:
-        row = conn.execute(
+        rows = conn.execute(
             """
-            SELECT
-                SUM(CASE WHEN status = 'indexed' THEN 1 ELSE 0 END) AS indexed,
-                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
-            FROM sources
-            WHERE workspace_id = ?
+            SELECT display_name, status FROM sources WHERE workspace_id = ?
             """,
             (workspace_id,),
-        ).fetchone()
-        return (row["indexed"] or 0, row["failed"] or 0)
+        ).fetchall()
+        indexed = sum(1 for r in rows if r["status"] == "indexed")
+        failed = sum(1 for r in rows if r["status"] == "failed")
+        names = [r["display_name"] for r in rows if r["status"] == "indexed"]
+        return (indexed, failed, names)
     finally:
         conn.close()
 
@@ -397,11 +398,21 @@ def _render_model_picker(workspace_id: str) -> str | None:
     Returns None when no model is configured (caller shows the no-model
     message); otherwise falls back from DEFAULT_MODEL_ID to the first
     configured model when the default's slug is unset (never crashes).
+
+    The option label shows the registry display_name AND the real .env slug as
+    read-only secondary context ("Standard (openai/gpt-4o)") — approved by the
+    owner (SPEC §14.3 note). Registry still owns the label; .env still owns the
+    slug; this only surfaces the env value via provider_model_name().
     """
     models = list_models()
     if not models:
         return None
-    model_labels = {m.model_id: m.display_name for m in models}
+
+    def _label(mid: str) -> str:
+        display = {m.model_id: m.display_name for m in models}[mid]
+        slug = provider_model_name(mid)
+        return f"{display} ({slug})" if slug else display
+
     try:
         default_index = [m.model_id for m in models].index(DEFAULT_MODEL_ID)
     except ValueError:
@@ -412,7 +423,7 @@ def _render_model_picker(workspace_id: str) -> str | None:
         selected_model_id = st.selectbox(
             "Model",
             options=[m.model_id for m in models],
-            format_func=lambda mid: model_labels[mid],
+            format_func=_label,
             index=default_index,
             key=f"model_picker_{workspace_id}",
         )
@@ -433,27 +444,39 @@ def _render_task_row(workspace_id: str, tasks: list[dict], disabled: bool = Fals
         return None
 
     selected_task_id = st.session_state.get(f"selected_task_{workspace_id}")
-    n = len(tasks) + (1 if selected_task_id else 0)
-    cols = st.columns(n)
 
-    for i, task in enumerate(tasks):
-        is_active = task["task_id"] == selected_task_id
-        with cols[i]:
-            if st.button(
-                task["name"],
-                key=f"task_btn_{task['task_id']}",
-                use_container_width=True,
-                type="primary" if is_active else "secondary",
-                disabled=disabled,
-            ):
-                st.session_state[f"selected_task_{workspace_id}"] = (
-                    None if is_active else task["task_id"]
-                )
-                st.rerun()
+    # UI review item 6: st.columns(len(tasks)+1) in ONE row is unusable past a
+    # handful of tasks (identical narrow columns, truncated labels). Use a
+    # compact column-width and let Streamlit WRAP into multiple rows via a
+    # sensible max buttons-per-row. This survives 5/10/20 tasks by wrapping
+    # instead of collapsing.
+    MAX_PER_ROW = 4
+    for row_start in range(0, len(tasks), MAX_PER_ROW):
+        group = tasks[row_start : row_start + MAX_PER_ROW]
+        cols = st.columns(len(group))
+        for i, task in enumerate(group):
+            is_active = task["task_id"] == selected_task_id
+            with cols[i]:
+                if st.button(
+                    task["name"],
+                    key=f"task_btn_{task['task_id']}",
+                    use_container_width=True,
+                    type="primary" if is_active else "secondary",
+                    disabled=disabled,
+                ):
+                    st.session_state[f"selected_task_{workspace_id}"] = (
+                        None if is_active else task["task_id"]
+                    )
+                    st.rerun()
 
     if selected_task_id:
-        with cols[-1]:
-            if st.button("Clear", key=f"clear_task_{workspace_id}", use_container_width=True):
+        cols = st.columns(1)
+        with cols[0]:
+            if st.button(
+                "Clear",
+                key=f"clear_task_{workspace_id}",
+                use_container_width=False,
+            ):
                 st.session_state[f"selected_task_{workspace_id}"] = None
                 st.rerun()
 
@@ -576,14 +599,22 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
     )
 
     # --- Grounding status (SPEC §5.2.4), all users --------------------------
-    indexed, failed = _grounding_summary(workspace_id)
+    indexed, failed, indexed_names = _grounding_summary(workspace_id)
     if indexed == 0:
-        st.warning(
-            "This Workspace has no indexed knowledge yet — answers will not be "
-            "grounded in any document. Upload sources from Manage."
+        # Grey (not Streamlit-yellow warning): this is an informational gap for
+        # every user, not an error (UI review item — "grey not yellow").
+        st.markdown(
+            '<div class="wa-pill wa-pill--gray">\u25cf No indexed knowledge '
+            "yet — answers will not be grounded in any document. "
+            "Upload sources from Manage.</div>",
+            unsafe_allow_html=True,
         )
     else:
         st.caption(f"{indexed} source{'s' if indexed != 1 else ''} indexed.")
+        # UI review item 4: show WHICH files, to every user — a Member must
+        # know what they are asking against, not just how many.
+        file_list = ", ".join(indexed_names)
+        st.caption(f"Indexed files: {file_list}")
     # Failed sources -> Owners only (Members don't need the failure detail).
     from config import TEST_USERS
     _is_owner = any(u["user_id"] == user_id and u["role"] == "owner" for u in TEST_USERS)
