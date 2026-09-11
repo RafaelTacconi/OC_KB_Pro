@@ -1,0 +1,101 @@
+# AML Workspace — theme tokens.
+#
+# Adapted from the vendored streamlit-ui-shell design system (references/design_system).
+# Both [theme.light] and [theme.dark] are fully defined — required for Streamlit's
+# in-app Settings -> Appearance switcher to appear at all; a bare [theme] block alone
+# locks the app to one mode.
+#
+# Font stack uses "Inter" with a system-font fallback chain (see assets/tokens.css) rather
+# than self-hosted @font-face files: no licensed .woff2 binaries ship in this PoC. Drop real
+# Inter/Inter Tight/JetBrains Mono files into static/fonts/ and add [[theme.fontFaces]]
+# blocks (see static/fonts/README.md) for pixel-perfect typography later — the app looks
+# clean either way because every custom element also falls back through the same stack.
+
+[theme]
+font           = "sans serif"
+codeFont       = "monospace"
+baseFontSize   = 14
+baseFontWeight = 400
+
+# Radius: 6px cards, 4px buttons/inputs.
+baseRadius   = "0.5rem"
+buttonRadius = "0.375rem"
+
+# Flat, hairline elevation — no drop shadows on cards/containers.
+showWidgetBorder  = true
+showSidebarBorder = true
+
+headingFont      = "sans serif"
+headingFontSizes = ["1.75rem", "1.375rem", "1.125rem"]
+
+[theme.light]
+primaryColor              = "#00965A"   # brand green — primary buttons, focus accents
+backgroundColor           = "#F7F8F9"   # page canvas
+secondaryBackgroundColor  = "#FFFFFF"   # card / widget fill / sidebar
+textColor                 = "#2D2926"   # ink — body text
+linkColor                 = "#007265"   # brand-green-dark — passes AA at body size
+
+borderColor = "#EAE9E7"
+
+greenColor            = "#00965A"
+greenTextColor        = "#007265"
+greenBackgroundColor  = "#E8F5EE"
+redColor              = "#C8102E"
+redTextColor          = "#C8102E"
+redBackgroundColor    = "#FCEBED"
+orangeColor           = "#E5A300"
+orangeTextColor       = "#E5A300"
+orangeBackgroundColor = "#FDF4DC"
+blueColor             = "#1B4D8F"
+blueTextColor         = "#1B4D8F"
+blueBackgroundColor   = "#E6EDF7"
+grayColor             = "#A8A6A3"
+grayTextColor         = "#6B6966"
+grayBackgroundColor   = "#F4F3F1"
+
+dataframeBorderColor           = "#EAE9E7"
+dataframeHeaderBackgroundColor = "#F4F3F1"
+codeBackgroundColor            = "#F4F3F1"
+
+[theme.light.sidebar]
+backgroundColor = "#FFFFFF"
+borderColor     = "#EAE9E7"
+
+[theme.dark]
+primaryColor              = "#00965A"
+backgroundColor           = "#1C1C1C"
+secondaryBackgroundColor  = "#262624"
+textColor                 = "#EDEDEC"
+linkColor                 = "#39A87B"
+
+borderColor = "#3A3A38"
+
+greenColor            = "#00965A"
+greenTextColor        = "#39A87B"
+greenBackgroundColor  = "#123324"
+redColor              = "#C8102E"
+redTextColor          = "#EF5B6C"
+redBackgroundColor    = "#3A171C"
+orangeColor           = "#E5A300"
+orangeTextColor       = "#E5A300"
+orangeBackgroundColor = "#3A2E12"
+blueColor             = "#1B4D8F"
+blueTextColor         = "#6E9BD6"
+blueBackgroundColor   = "#16233A"
+grayColor             = "#A8A6A3"
+grayTextColor         = "#C9C7C4"
+grayBackgroundColor   = "#2E2E2C"
+
+dataframeBorderColor           = "#3A3A38"
+dataframeHeaderBackgroundColor = "#262624"
+codeBackgroundColor            = "#262624"
+
+[theme.dark.sidebar]
+backgroundColor = "#262624"
+borderColor     = "#3A3A38"
+
+[client]
+toolbarMode = "auto"
+
+[logger]
+level = "info"

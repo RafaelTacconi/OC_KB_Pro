@@ -1,0 +1,20 @@
+streamlit>=1.38
+pandas>=2.2
+openpyxl>=3.1
+tabulate>=0.9        # required by pandas.DataFrame.to_markdown()
+sentence-transformers>=3.0
+numpy>=1.26
+
+# PDF/DOCX parsing — primary (layout-aware). Confirm this installs cleanly
+# on the target host EARLY (spec Section 14, build-order step 2). If it
+# doesn't, use the fallbacks below only.
+unstructured[pdf,docx]>=0.15
+
+# Pure-Python fallback parsers (no system dependencies) — spec Section 7.2 /
+# Section 13.1. Keep these installed regardless, since ingestion falls back
+# to them automatically if unstructured import/parsing fails.
+pypdf>=4.0
+python-docx>=1.1
+
+# Dev / test only — not required to run the app.
+pytest>=8.0

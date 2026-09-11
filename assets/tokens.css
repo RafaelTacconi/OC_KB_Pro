@@ -1,0 +1,188 @@
+/* tokens.css — structural rules only (shape, spacing, sizing, layout). No color values
+   live here except where noted — colors that need to react to light/dark mode are injected
+   by ui/theme.py's color_css(), which reads st.context.theme.type at render time. This file
+   is injected first (always, both themes), then color_css()'s <style> block is appended. */
+
+:root {
+  --wa-font: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --wa-font-condensed: "Inter Tight", "Inter", -apple-system, "Segoe UI", sans-serif;
+  --wa-font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+  --wa-radius-sm: 4px;
+  --wa-radius-md: 6px;
+  --wa-radius-lg: 10px;
+  --wa-radius-pill: 999px;
+
+  --wa-space-1: 4px;
+  --wa-space-2: 8px;
+  --wa-space-3: 12px;
+  --wa-space-4: 16px;
+  --wa-space-5: 20px;
+  --wa-space-6: 24px;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Sidebar wordmark
+--------------------------------------------------------------------------------------- */
+.wa-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--wa-space-2);
+  margin: 2px 0 var(--wa-space-5) 0;
+}
+.wa-brand__mark {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+.wa-brand__name {
+  font-family: var(--wa-font-condensed);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+.wa-brand__sub {
+  font-family: var(--wa-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-top: 1px;
+}
+
+[data-testid="stSidebarHeader"] { min-height: 0px !important; padding-top: 0.5rem !important; }
+[data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+
+/* ---------------------------------------------------------------------------------------
+   Eyebrow — small uppercase label used above a section title
+--------------------------------------------------------------------------------------- */
+.wa-eyebrow {
+  font-family: var(--wa-font);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 2px;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Page header — title + caption + optional trailing badge, one consistent block used at
+   the top of every screen.
+--------------------------------------------------------------------------------------- */
+.wa-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--wa-space-4);
+  margin-bottom: var(--wa-space-2);
+}
+.wa-page-header h1 {
+  font-family: var(--wa-font-condensed) !important;
+  font-size: 1.6rem !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+  line-height: 1.25 !important;
+}
+.wa-page-header__caption {
+  font-family: var(--wa-font);
+  font-size: 0.86rem;
+  opacity: 0.65;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Status / citation pills — five semantic families + a neutral "source" variant.
+   Hard rule: color always pairs with a glyph, never color alone.
+--------------------------------------------------------------------------------------- */
+.wa-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.65rem;
+  border-radius: var(--wa-radius-pill);
+  font-family: var(--wa-font);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+.wa-pill-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem; }
+
+/* ---------------------------------------------------------------------------------------
+   Source citation chip — document glyph + name, used under assistant chat messages
+--------------------------------------------------------------------------------------- */
+.wa-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--wa-radius-md);
+  font-family: var(--wa-font);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  border: 1px solid transparent;
+}
+.wa-source-chip__name { font-weight: 600; }
+.wa-source-chip__section { opacity: 0.7; }
+
+/* ---------------------------------------------------------------------------------------
+   Task chips — the "/" predefined-task row in chat
+--------------------------------------------------------------------------------------- */
+.wa-task-label {
+  font-family: var(--wa-font-mono);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------------------------------
+   KPI strip — first item is the hero (brand green), the rest use ink (design rule).
+--------------------------------------------------------------------------------------- */
+.wa-kpi-value {
+  font-family: var(--wa-font-condensed);
+  font-weight: 700;
+  font-size: 2.1rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.wa-kpi-label {
+  font-family: var(--wa-font);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Manage-view left rail — the section switcher, styled from the app's one st.radio
+   instance. Scoped globally by role rather than a wrapper class: Streamlit widgets can't
+   be nested inside custom markdown, so a `.wa-rail > st.radio` containment doesn't exist
+   in the rendered DOM — keying off `[role="radiogroup"]` is the stable alternative, and
+   this app has exactly one radio group (the manage-view rail) to style this way.
+--------------------------------------------------------------------------------------- */
+div[role="radiogroup"] { gap: 2px; flex-direction: column; }
+div[role="radiogroup"] label {
+  border-radius: var(--wa-radius-md);
+  padding: 0.45rem 0.7rem !important;
+  width: 100%;
+  font-family: var(--wa-font);
+  font-size: 0.86rem;
+}
+div[role="radiogroup"] label > div:first-child {
+  display: none; /* hide the native radio dot — the highlighted background is the state */
+}
+
+/* Numeric cells read as tabular figures wherever the app renders numbers in HTML. */
+.wa-tabular { font-variant-numeric: tabular-nums; }
+
+/* Empty-state block */
+.wa-empty {
+  padding: var(--wa-space-6) var(--wa-space-4);
+  text-align: center;
+  font-family: var(--wa-font);
+  font-size: 0.86rem;
+  opacity: 0.55;
+}

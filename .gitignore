@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Runtime data (SQLite DB + uploaded sources) — created on first run
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
