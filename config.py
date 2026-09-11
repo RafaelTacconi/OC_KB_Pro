@@ -133,8 +133,9 @@ def seed_default_workspace() -> None:
 
 def bootstrap() -> None:
     """Call once at app startup — idempotent."""
-    from db import init_db
+    from db import init_db, migrate_db
 
     init_db()
+    migrate_db()  # idempotent; upgrades a pre-3/4 database (SPEC §4.5)
     seed_users()
     seed_default_workspace()

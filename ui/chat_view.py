@@ -62,16 +62,45 @@ def _load_workspace(workspace_id: str) -> dict:
         conn.close()
 
 
-def _load_history(workspace_id: str, user_id: str) -> list[dict]:
+def _load_history(chat_id: str) -> list[dict]:
+    from db import get_connection
+
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM chat_messages WHERE chat_id = ? ORDER BY created_at",
+            (chat_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def _load_chat(chat_id: str) -> dict:
+    from db import get_connection
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM chats WHERE chat_id = ?", (chat_id,)
+        ).fetchone()
+        return dict(row) if row else {}
+    finally:
+        conn.close()
+
+
+def _load_user_chats(workspace_id: str, user_id: str) -> list[dict]:
+    """All Chats for one (Workspace, user) — most recently updated first
+    (SPEC §6.2 listing, ordered by updated_at DESC)."""
     from db import get_connection
 
     conn = get_connection()
     try:
         rows = conn.execute(
             """
-            SELECT * FROM chat_messages
+            SELECT * FROM chats
             WHERE workspace_id = ? AND user_id = ?
-            ORDER BY created_at
+            ORDER BY updated_at DESC
             """,
             (workspace_id, user_id),
         ).fetchall()
@@ -80,26 +109,66 @@ def _load_history(workspace_id: str, user_id: str) -> list[dict]:
         conn.close()
 
 
+def _chat_title_from_message(text: str) -> str:
+    """SPEC §6.2 / OPEN-7 interim: title is the first message truncated to 60
+    chars, single line, trailing whitespace stripped, ellipsis if truncated."""
+    one_line = " ".join(text.split())
+    if len(one_line) <= 60:
+        return one_line
+    return one_line[:60].rstrip() + "\u2026"
+
+
 def _save_message(
     workspace_id: str,
     user_id: str,
+    chat_id: str | None,
     role: str,
     content: str,
     cited_sources: list[dict] | None = None,
     retrieved_chunk_ids: list[str] | None = None,
     task_id: str | None = None,
     model_id: str | None = None,
-) -> None:
+) -> str:
+    """
+    Persist one message. Returns the resolved chat_id.
+
+    `chat_id` is REQUIRED by the write path (SPEC §4.3 — app enforces non-null
+    even though the column is SQL-nullable for migration). When chat_id is
+    None (a lazy "+ New chat", SPEC §6.2) the `chats` row is created IN THE
+    SAME transaction, chat row FIRST — foreign_keys=ON means the parent row
+    must exist before the message insert (Step 3/4 plan, item 3). This keeps
+    §7.1 "persist the user's message first" and avoids any NULL-chat_id window.
+
+    On a new Chat's first USER message the title is set to the message text
+    (OPEN-7 interim titling); otherwise the Chat's updated_at is bumped.
+    """
+    now = _now()
     with transaction() as conn:
+        if chat_id is None:
+            chat_id = uuid.uuid4().hex
+            title = _chat_title_from_message(content) if role == "user" else "New chat"
+            conn.execute(
+                """
+                INSERT INTO chats (chat_id, workspace_id, user_id, title, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (chat_id, workspace_id, user_id, title, now, now),
+            )
+        else:
+            conn.execute(
+                "UPDATE chats SET updated_at = ? WHERE chat_id = ?",
+                (now, chat_id),
+            )
         conn.execute(
             """
             INSERT INTO chat_messages
-                (message_id, workspace_id, user_id, role, content,
+                (message_id, chat_id, workspace_id, user_id, role, content,
                  cited_sources, retrieved_chunk_ids, task_id, model_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 uuid.uuid4().hex,
+                chat_id,
                 workspace_id,
                 user_id,
                 role,
@@ -108,9 +177,10 @@ def _save_message(
                 json.dumps(retrieved_chunk_ids) if retrieved_chunk_ids is not None else None,
                 task_id,
                 model_id,
-                _now(),
+                now,
             ),
         )
+    return chat_id
 
 
 def _clear_pending_error() -> None:
@@ -123,6 +193,7 @@ def _clear_pending_error() -> None:
 def _run_turn(
     workspace_id: str,
     user_id: str,
+    chat_id: str,
     user_input: str,
     model_id: str,
     task: dict | None = None,
@@ -132,6 +203,9 @@ def _run_turn(
     Deliberately free of Streamlit (SPEC.md §7.1) so the caller owns the
     spinner and this can run from the Retry path too. Raises on any failure —
     nothing is persisted for the assistant unless this returns normally.
+
+    `chat_id` is REQUIRED — the Chat already exists (created with the user's
+    persisted first message); the assistant message persists into it.
 
     Returns True when the turn ran with degraded retrieval — semantic search
     was unavailable and the answer is grounded in lexical (keyword) results
@@ -164,7 +238,7 @@ def _run_turn(
     retrieved_chunk_ids = [c["chunk_id"] for c in chunks]
 
     _save_message(
-        workspace_id, user_id, "assistant", answer_text,
+        workspace_id, user_id, chat_id, "assistant", answer_text,
         cited_sources=cited_sources,
         retrieved_chunk_ids=retrieved_chunk_ids,
         task_id=task["task_id"] if task else None,
@@ -173,11 +247,12 @@ def _run_turn(
     return degraded
 
 
-def _stash_error(workspace_id: str, user_id: str, user_input: str,
+def _stash_error(workspace_id: str, user_id: str, chat_id: str, user_input: str,
                  model_id: str, task: dict | None, exc: Exception) -> None:
     st.session_state["wa_pending_error"] = {
         "workspace_id": workspace_id,
         "user_id": user_id,
+        "chat_id": chat_id,
         "user_input": user_input,
         "model_id": model_id,
         "task": task,
@@ -190,6 +265,7 @@ def _answer(
     user_id: str,
     user_input: str,
     model_id: str,
+    chat_id: str | None = None,
     task: dict | None = None,
 ) -> None:
     """
@@ -197,29 +273,34 @@ def _answer(
     (spec Section 9.1 — same assembly order, task adds a stored prompt).
 
     Error handling per SPEC.md §7.1:
-      1. The user's message is persisted FIRST, in its own short transaction,
-         before retrieval or the model call, so it survives any downstream
-         failure.
+      1. The user's message is persisted FIRST — in its own short transaction,
+         before retrieval or the model call — so it survives any downstream
+         failure. If `chat_id` is None (lazy "+ New chat", §6.2) the Chat row
+         is created in that SAME transaction, chat first (foreign_keys=ON),
+         and the resolved chat_id becomes the active one. The user's input
+         must never be lost.
       2. Retrieval + prompt assembly + model call are wrapped in try/except.
       3. On failure the error is stashed in session state (wa_pending_error)
-         and rendered as an inline assistant bubble with a Retry control after
-         the rerun — it never reaches Streamlit's error screen, and no
-         assistant message is persisted.
+         WITH the chat_id (Step 3/4 item 2) and rendered as an inline
+         assistant bubble with a Retry control after the rerun — it never
+         reaches Streamlit's error screen, and no assistant message is
+         persisted.
       4. A successful turn that had to degrade to lexical-only retrieval (§7.3)
          sets wa_semantic_degraded so the chat view shows a visible note.
     """
     _clear_pending_error()
     st.session_state.pop("wa_semantic_degraded", None)
-    _save_message(
-        workspace_id, user_id, "user", user_input,
+    chat_id = _save_message(
+        workspace_id, user_id, chat_id, "user", user_input,
         task_id=task["task_id"] if task else None,
     )
+    st.session_state["wa_chat_id"] = chat_id
 
     try:
         with st.spinner("Thinking..."):
-            degraded = _run_turn(workspace_id, user_id, user_input, model_id, task=task)
+            degraded = _run_turn(workspace_id, user_id, chat_id, user_input, model_id, task=task)
     except Exception as exc:  # noqa: BLE001 - see §7.1
-        _stash_error(workspace_id, user_id, user_input, model_id, task, exc)
+        _stash_error(workspace_id, user_id, chat_id, user_input, model_id, task, exc)
         return
     if degraded:
         st.session_state["wa_semantic_degraded"] = True
@@ -227,7 +308,9 @@ def _answer(
 
 def _retry() -> None:
     """Re-run the failed turn from the already-persisted user message.
-    Never re-persists the user message (SPEC.md §7.1 / A13)."""
+    Never re-persists the user message (SPEC.md §7.1 / A13). Uses the
+    payload's chat_id, NOT session state, so a retry always lands in the
+    SAME chat the failure happened in (Step 3/4 item 2)."""
     payload = st.session_state.get("wa_pending_error")
     if not payload:
         return
@@ -238,13 +321,14 @@ def _retry() -> None:
             degraded = _run_turn(
                 payload["workspace_id"],
                 payload["user_id"],
+                payload["chat_id"],
                 payload["user_input"],
                 payload["model_id"],
                 task=payload.get("task"),
             )
     except Exception as exc:  # noqa: BLE001
         _stash_error(
-            payload["workspace_id"], payload["user_id"],
+            payload["workspace_id"], payload["user_id"], payload["chat_id"],
             payload["user_input"], payload["model_id"],
             payload.get("task"), exc,
         )
@@ -255,14 +339,19 @@ def _retry() -> None:
     st.rerun()
 
 
-def _render_pending_error(workspace_id: str, user_id: str) -> None:
+def _render_pending_error(workspace_id: str, user_id: str, chat_id: str | None) -> None:
     """Render the stashed turn error as an inline assistant bubble with a
-    Retry control. Clears the stash if it belongs to a different user or
-    Workspace (a stale error from another context must not show here)."""
+    Retry control. Clears the stash if it belongs to a different user,
+    Workspace, or Chat (a stale error from another context — e.g. after a
+    user/Workspace/Chat switch — must not show here)."""
     payload = st.session_state.get("wa_pending_error")
     if not payload:
         return
-    if payload.get("workspace_id") != workspace_id or payload.get("user_id") != user_id:
+    if (
+        payload.get("workspace_id") != workspace_id
+        or payload.get("user_id") != user_id
+        or payload.get("chat_id") != chat_id
+    ):
         _clear_pending_error()
         return
     with st.chat_message("assistant"):
@@ -344,6 +433,80 @@ def _render_task_row(workspace_id: str, tasks: list[dict]) -> dict | None:
     return next((t for t in tasks if t["task_id"] == selected_task_id), None)
 
 
+def _resolve_active_chat(workspace_id: str, user_id: str, chats: list[dict]) -> str | None:
+    """
+    Step 3/4 item 1 (also pre-empts Step 5's Workspace switching): validate on
+    every render that `wa_chat_id` belongs to the CURRENT (workspace_id,
+    user_id). The sidebar user selectbox switches users WITHOUT clearing
+    session state, and _load_history(chat_id) no longer filters on user_id —
+    so a stale wa_chat_id from another user or Workspace would leak another
+    user's Chat. Returns the validated active chat_id.
+
+    First-visit default: if `wa_chat_id` has NEVER been set in this session,
+    default to the most recently updated Chat. If it was EXPLICITLY set to
+    None ("+ New chat", lazy per §6.2) it stays None — an empty new Chat.
+    """
+    has_active = "wa_chat_id" in st.session_state
+    active = st.session_state.get("wa_chat_id")
+    if active is not None:
+        if not any(c["chat_id"] == active for c in chats):
+            # stale — belongs to another user or Workspace
+            st.session_state.pop("wa_chat_id", None)
+            return None
+        return active
+    # active is None
+    if not has_active and chats:
+        # first visit to this (workspace, user): default to most recent
+        st.session_state["wa_chat_id"] = chats[0]["chat_id"]
+        return chats[0]["chat_id"]
+    return None
+
+
+def _render_chat_row(workspace_id: str, user_id: str) -> tuple[str | None, list[dict]]:
+    """
+    SPEC §6.2 — the chat selector (ordered by updated_at DESC) + "+ New chat"
+    button above the conversation. Returns (active_chat_id, chats_list).
+    """
+    chats = _load_user_chats(workspace_id, user_id)
+    active = _resolve_active_chat(workspace_id, user_id, chats)
+
+    st.markdown('<div class="wa-eyebrow">Conversation</div>', unsafe_allow_html=True)
+
+    col_sel, col_new = st.columns([3, 1], vertical_alignment="center")
+    if chats and active is not None:
+        chat_labels = {c["chat_id"]: (c["title"] or "New chat") for c in chats}
+        options = [c["chat_id"] for c in chats]
+        with col_sel:
+            current_index = options.index(active)
+            chosen = st.selectbox(
+                "Chat",
+                options=options,
+                format_func=lambda cid: chat_labels[cid],
+                index=current_index,
+                key=f"chat_selector_{workspace_id}_{user_id}",
+            )
+        if chosen != active:
+            st.session_state["wa_chat_id"] = chosen
+            st.rerun()
+    else:
+        with col_sel:
+            if chats:
+                # Active is None because a new chat is pending.
+                st.caption("Starting a new conversation.")
+            else:
+                st.caption("No conversations yet — answers will start a new thread.")
+    with col_new:
+        if st.button(
+            "+ New chat",
+            key=f"new_chat_{workspace_id}_{user_id}",
+            use_container_width=True,
+        ):
+            st.session_state["wa_chat_id"] = None
+            st.session_state.pop(f"selected_task_{workspace_id}", None)
+            st.rerun()
+    return active, chats
+
+
 def render_chat_view(workspace_id: str, user_id: str) -> None:
     workspace = _load_workspace(workspace_id)
 
@@ -364,8 +527,22 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
         )
     st.divider()
 
-    # --- History ------------------------------------------------------------
-    history = _load_history(workspace_id, user_id)
+    # --- Chat selector + "+ New chat" (SPEC §6.2) --------------------------
+    # _render_chat_row validates on every render that the active chat belongs
+    # to THIS (workspace, user) (Step 3/4 item 1) — covers the sidebar user
+    # switch AND future Workspace switches, clearing any stale wa_chat_id.
+    active_chat_id, _ = _render_chat_row(workspace_id, user_id)
+    active_chat = _load_chat(active_chat_id) if active_chat_id else {}
+
+    # §6.5 honesty requirement (OPEN-3 interim, Option A): the assistant has
+    # no memory of earlier turns — say so plainly, do not imply it remembers.
+    st.caption(
+        "Each question is answered independently from this Workspace's knowledge "
+        "— the assistant does not remember earlier turns in this conversation."
+    )
+
+    # --- History (only the active Chat's messages, SPEC §6.3) ---------------
+    history = _load_history(active_chat_id) if active_chat_id else []
     if not history:
         st.markdown(
             '<div class="wa-empty">No messages yet — ask a question below, '
@@ -379,7 +556,7 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
                 source_chips(json.loads(msg["cited_sources"]))
 
     # --- Pending turn error (SPEC.md §7.1) rendered as the latest bubble ----
-    _render_pending_error(workspace_id, user_id)
+    _render_pending_error(workspace_id, user_id, active_chat_id)
 
     # --- Semantic-retrieval degrade note (SPEC.md §7.3 / A15) ---------------
     if st.session_state.get("wa_semantic_degraded"):
@@ -404,12 +581,14 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
                 task_input = st.text_area(active_task["input_label"], height=120)
                 submitted = st.form_submit_button("Run task", type="primary")
             if submitted and task_input.strip():
-                _answer(workspace_id, user_id, task_input, selected_model_id, task=active_task)
+                _answer(workspace_id, user_id, task_input, selected_model_id,
+                        chat_id=active_chat_id, task=active_task)
                 st.session_state[f"selected_task_{workspace_id}"] = None
                 st.rerun()
 
     # --- Free-form chat input -------------------------------------------------
     user_question = st.chat_input("Type your question...")
     if user_question:
-        _answer(workspace_id, user_id, user_question, selected_model_id, task=None)
+        _answer(workspace_id, user_id, user_question, selected_model_id,
+                chat_id=active_chat_id)
         st.rerun()

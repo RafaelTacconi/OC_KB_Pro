@@ -17,6 +17,7 @@ close/return, then do the slow external work.
 from __future__ import annotations
 
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -88,8 +89,20 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at      TEXT NOT NULL
 );
 
+-- A Chat is a named conversation thread: one (Workspace, user) pair owns many
+-- Chats; Messages belong to exactly one Chat (SPEC §4.2, §6).
+CREATE TABLE IF NOT EXISTS chats (
+    chat_id       TEXT PRIMARY KEY,
+    workspace_id  TEXT NOT NULL REFERENCES workspaces(workspace_id),
+    user_id       TEXT NOT NULL REFERENCES users(user_id),
+    title         TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS chat_messages (
     message_id          TEXT PRIMARY KEY,
+    chat_id             TEXT REFERENCES chats(chat_id),
     workspace_id        TEXT NOT NULL REFERENCES workspaces(workspace_id),
     user_id             TEXT NOT NULL REFERENCES users(user_id),
     role                TEXT NOT NULL,
@@ -100,6 +113,18 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     model_id            TEXT,   -- which AI model produced this message (assistant rows only)
     created_at          TEXT NOT NULL
 );
+"""
+
+# Indexes for the multi-Workspace / multi-Chat hot queries (SPEC §4.4).
+# Kept separate from SCHEMA so migrate_db() can run them AFTER the legacy
+# chat_messages table has been ALTERed to add chat_id — the index creation
+# references chat_id, which a legacy table does not have yet.
+INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_chunks_workspace   ON chunks(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_sources_workspace  ON sources(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_workspace    ON tasks(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_chats_ws_user      ON chats(workspace_id, user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_messages_chat      ON chat_messages(chat_id, created_at);
 """
 
 
@@ -124,6 +149,68 @@ def init_db(db_path: str | Path = DB_PATH) -> None:
     conn = get_connection(db_path)
     try:
         conn.executescript(SCHEMA)
+        conn.executescript(INDEXES)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def migrate_db(db_path: str | Path = DB_PATH) -> None:
+    """
+    Idempotent migration for databases created before Steps 3/4 (SPEC §4.5).
+    Safe on a fresh DB and safe to run repeatedly.
+
+    Runs SCHEMA first (CREATE TABLE IF NOT EXISTS) so the `chats` table
+    exists even if this is the first function to touch the DB — migrate_db()
+    must be safe to call on a legacy DB alone, not only after init_db().
+    The ALTER (add chat_id) runs BEFORE the indexes, because a legacy
+    chat_messages table has no chat_id column for the index to reference.
+
+    1. Add `chat_messages.chat_id` if absent (nullable at SQL level — legacy
+       rows exist; app code enforces non-null, §4.3).
+    2. Backfill: for each distinct (workspace_id, user_id) with NULL chat_id,
+       create one `chats` row titled "Imported conversation" with
+       created_at = earliest message timestamp, updated_at = latest.
+    3. Create the indexing views (SPEC §4.4).
+    """
+    conn = get_connection(db_path)
+    try:
+        conn.executescript(SCHEMA)  # ensure chats table (+ anything missing) exists
+        # 1. chat_id column
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)")]
+        if "chat_id" not in cols:
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN chat_id TEXT REFERENCES chats(chat_id)")
+        # 3. Indexes (AFTER the ALTER — they reference chat_id).
+        conn.executescript(INDEXES)
+
+        # 2. Backfill — only rows still NULL (created before this migration).
+        groups = conn.execute(
+            """
+            SELECT workspace_id, user_id,
+                   MIN(created_at) AS first_at,
+                   MAX(created_at) AS last_at
+            FROM chat_messages
+            WHERE chat_id IS NULL
+            GROUP BY workspace_id, user_id
+            """
+        ).fetchall()
+        for g in groups:
+            chat_id = uuid.uuid4().hex
+            conn.execute(
+                """
+                INSERT INTO chats (chat_id, workspace_id, user_id, title, created_at, updated_at)
+                VALUES (?, ?, ?, 'Imported conversation', ?, ?)
+                """,
+                (chat_id, g["workspace_id"], g["user_id"], g["first_at"], g["last_at"]),
+            )
+            conn.execute(
+                """
+                UPDATE chat_messages SET chat_id = ?
+                WHERE workspace_id = ? AND user_id = ? AND chat_id IS NULL
+                """,
+                (chat_id, g["workspace_id"], g["user_id"]),
+            )
+
         conn.commit()
     finally:
         conn.close()
