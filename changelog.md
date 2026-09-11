@@ -7,6 +7,57 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Step 5 — Multi-Workspace (SPEC.md §5)
+
+Multiple Workspaces per Owner, as specified in §3.1 (the data model already
+assumed it; only app.py and the eval harness referenced the constant).
+
+**Modified**
+- `app.py` — Workspace switcher in the sidebar (below the user selectbox, above
+  navigation): lists the current user's Workspaces via the §5.3 `workspace_members`
+  join, ordered by name, persisted in `wa_workspace_id`. `_resolve_workspace()`
+  defaults to the first visible on startup / when the stored id is no longer
+  visible to the current user (re-evaluates on user switch, §5.2.1). Switching
+  clears the old Workspace's `selected_task_{old}` and `wa_chat_id`, then reruns.
+  Owner-only "+ New Workspace" expander (§5.2.2: Name required, Instructions
+  optional; empty names rejected inline). Branding fix (§5.2.3): page_title is the
+  product-level `APP_TITLE` constant; `render_brand()` is called with the current
+  Workspace's name — nothing Workspace-specific hardcoded in page chrome (A6).
+  Routes the two views with the resolved `workspace_id`.
+- `config.py` — `APP_TITLE = "AI Workspace"`; `create_workspace(name, instructions,
+  owner)` inserts the Workspace + a `workspace_members` row per EVERY TEST_USER
+  (OPEN-4 interim, §5.3); `DEFAULT_WORKSPACE_ID` comment updated (§5.1).
+
+**Added**
+- `tests/test_workspace_isolation.py` — A2 at the retrieval layer: two Workspaces,
+  each with Sources/chunks/FTS/embeddings; asserts `lexical_search`,
+  `semantic_search`, and `hybrid_search` for Workspace A return nothing from
+  Workspace B, covering the two independent filters separately (embedding model
+  stubbed with a deterministic zero-vector — no HF download).
+- `tests/test_multi_workspace.py` — AppTest: A1 (Owner creates a Workspace, it
+  appears and is selected, membership = all TEST_USERS), A4 (Workspace switch
+  clears selected task + active chat), A5 (Member sees only their Workspaces and
+  no Manage button), A6 (branding shows the current Workspace name).
+- `tests/conftest.py` — session-scoped assertion that no `data/` directory exists
+  at the repo root after the suite runs (mechanical guard for AppTest cwd
+  isolation).
+
+**Schema and migration changes**
+- None. `workspaces` and `workspace_members` already supported this.
+
+**Acceptance criteria satisfied**
+- A1, A2, A4, A5, A6. All prior criteria still green.
+
+**Known-broken / deferred**
+- OPEN-5: duplicate Workspace names not rejected (only empty names are). OPEN-6/8
+  (Workspace/Chat rename+delete) not built — out of scope until decided.
+- The switcher uses a generation counter in the selectbox key so a newly created
+  Workspace is actually selected on the next render (avoids the widget retaining a
+  stale value); noted so Step 7's cleanup doesn't "simplify" it into the double-answer
+  trap (§5.2.1 + Step-5 item 2).
+
+---
+
 ## 2026-09-11 — Step 3 + 4 — Schema (chats) + Multi-Chat, landed together
 
 Steps 3 and 4 shipped as ONE commit (owner-delegated decision, agent chose

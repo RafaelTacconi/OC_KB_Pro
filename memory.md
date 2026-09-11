@@ -50,18 +50,25 @@ Authority: Agent applied spec interim. NOT answered by project owner.
 Consequence: Switching to Option B (history in the prompt) later touches `build_prompt()`,
 its token budget, and possibly the retrieval query — a contained, spec'd delta (§6.5).
 
-### OPEN-4 — Membership on a new Workspace
+### OPEN-4 — Membership on a new Workspace — 2026-09-11
 Question: Who is a member of a newly created Workspace (`SPEC.md` §5.3)?
-Outcome: Deferred — not reached.
-Authority: Deferred — not reached.
-Consequence: Under the interim rule (all `TEST_USERS`), an Owner cannot create a private
-Workspace.
+Outcome: **Interim applied.** On Workspace creation (`config.create_workspace`), a
+`workspace_members` row is inserted for EVERY entry in `TEST_USERS`, mirroring the seed
+behaviour. The Workspace list a user sees is derived from `workspace_members` (§5.3 join),
+never from `workspaces` directly, so a rule change needs one place only.
+Authority: Agent applied spec interim. NOT answered by project owner.
+Consequence: An Owner cannot create a private Workspace. If per-Workspace access control is
+wanted, it is a new requirement needing an invite/removal mechanism in Manage → Users
+(currently read-only), plus an explicit decision.
 
-### OPEN-5 — Name uniqueness
+### OPEN-5 — Name uniqueness — 2026-09-11
 Question: Should Workspace names (and Task names) be unique?
-Outcome: Deferred — not reached.
-Authority: Deferred — not reached.
-Consequence: Duplicate names in a selectbox are indistinguishable to the user.
+Outcome: **Interim applied.** Uniqueness is NOT enforced — two Workspaces may share a name
+(`workspaces.name` has no unique constraint). Only empty/whitespace-only names are rejected
+at creation (inline message, no row inserted). This is a known usability hazard with a
+name-labelled selectbox.
+Authority: Agent applied spec interim. NOT answered by project owner.
+Consequence: Duplicate names in the switcher/selectbox are indistinguishable to the user.
 
 ### OPEN-6 — Workspace rename and delete
 Question: Can a Workspace be renamed or deleted? What happens to users currently in it, and
