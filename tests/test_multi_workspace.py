@@ -91,8 +91,9 @@ def test_a1_owner_creates_workspace_and_it_is_selected(
 
 
 def test_a4_switch_clears_task_and_active_chat(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, configured_model
 ) -> None:
+    # task buttons are disabled without a model (§15.2)
     monkeypatch.chdir(tmp_path)
     at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()
     assert not at.exception

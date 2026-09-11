@@ -53,7 +53,7 @@ def _count_by_role(rows: list[dict], role: str) -> int:
 
 
 def test_failed_turn_persists_question_and_retry_does_not_duplicate(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, configured_model
 ) -> None:
     attempts: list[str] = []
 
@@ -62,7 +62,6 @@ def test_failed_turn_persists_question_and_retry_does_not_duplicate(
         raise RuntimeError("forced model failure for §7.1 test")
 
     monkeypatch.setattr(ui.chat_view, "call_model", _failing_call_model)
-    os.environ["HF_HUB_OFFLINE"] = "1"
     monkeypatch.chdir(tmp_path)
 
     at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()

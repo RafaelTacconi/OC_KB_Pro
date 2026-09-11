@@ -33,8 +33,10 @@ MSG_B1 = "Unrelated question about procedure"
 
 
 @pytest.fixture()
-def stubbed_answer(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Stub call_model so a send persists a user + assistant message."""
+def stubbed_answer(monkeypatch: pytest.MonkeyPatch, configured_model) -> list[str]:
+    """Stub call_model so a send persists a user + assistant message. Also
+    configure a model (the conftest autouse fixture blanks OPENAI_* so nothing
+    leaks from the dev .env); without it the chat input is disabled (§15.2)."""
     calls: list[str] = []
 
     def fake_call(prompt: str, model_id: str) -> str:

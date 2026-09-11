@@ -29,7 +29,7 @@ QUESTION = "What is the escalation window?"
 
 
 @pytest.fixture()
-def stubbed_answer(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+def stubbed_answer(monkeypatch: pytest.MonkeyPatch, configured_model) -> list[str]:
     calls: list[str] = []
 
     def fake_call(prompt: str, model_id: str) -> str:
@@ -41,7 +41,9 @@ def stubbed_answer(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 def _seed_failing_call(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """A call_model that always fails (for the pending-error interaction)."""
+    """A call_model that always fails (for the pending-error interaction).
+    NOTE: the calling test must request the `configured_model` fixture first so
+    the chat input is enabled (SPEC §15.2)."""
     attempts: list[str] = []
 
     def _failing(prompt: str, model_id: str) -> str:
@@ -107,7 +109,7 @@ def test_freetext_without_task_has_no_note(
 
 
 def test_freetext_while_task_selected_plus_pending_error(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, configured_model
 ):
     """§7.6 x §7.1 interaction: a free-text send during an active task with a
     failing model must do BOTH — clear the task + set the inline note, AND
