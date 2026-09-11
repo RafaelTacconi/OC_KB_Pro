@@ -22,7 +22,7 @@ import streamlit as st
 from db import get_connection, transaction
 from ingestion.pipeline import delete_source, ingest_source
 from ui.cards import kpi_row
-from ui.pills import pill, render as render_pill
+from ui.pills import ROLE_PILL_MAP, pill, render as render_pill
 from ui.theme import page_header
 
 SOURCE_TYPE_BY_EXT = {"pdf": "pdf", "docx": "docx", "xlsx": "xlsx"}
@@ -33,10 +33,6 @@ SOURCE_STATUS_MAP = {
     "processing": ("blue", "\u25d0"),    # ◐
     "pending": ("gray", "\u25cb"),       # ○
     "failed": ("red", "\u2715"),         # ✕
-}
-ROLE_PILL_MAP = {
-    "owner": ("green", "\u25c6"),        # ◆
-    "member": ("gray", "\u25cf"),        # ●
 }
 
 SECTIONS = ["Knowledge", "Instructions", "Prompts (/)", "Users", "Summary"]
@@ -174,7 +170,10 @@ def _render_knowledge_section(workspace_id: str) -> None:
                     with cols[1]:
                         render_pill(pill(src["status"], SOURCE_STATUS_MAP))
                         if src["status"] == "failed" and src.get("error_message"):
-                            st.caption(src["error_message"])
+                            st.caption(
+                                "Indexing failed — "
+                                f"{src['error_message']}"
+                            )
                     if cols[2].button("Delete", key=f"delete_{src['source_id']}",
                                        use_container_width=True):
                         st.session_state[flag_key] = True
@@ -273,7 +272,9 @@ def _render_instructions_section(workspace_id: str) -> None:
                     "UPDATE workspaces SET instructions = ?, updated_at = ? WHERE workspace_id = ?",
                     (instructions, _now(), workspace_id),
                 )
-            st.success("Saved.")
+            # §7.8: st.success before st.rerun() would be discarded by the
+            # rerun — set a flag rendered after it instead.
+            st.session_state["wa_owner_toast"] = "Saved."
             st.rerun()
 
 
@@ -313,7 +314,8 @@ def _render_tasks_section(workspace_id: str) -> None:
                         """,
                         (name, description, prompt, input_label, task["task_id"]),
                     )
-                st.success("Saved.")
+                # §7.8: flag rendered after the rerun (see instructions save).
+                st.session_state["wa_owner_toast"] = "Saved."
                 st.rerun()
             if delete:
                 # SPEC §7.4 — a form's submit buttons can't host the confirm
@@ -422,6 +424,9 @@ _SECTION_RENDERERS = {
 
 def render_owner_view(workspace_id: str) -> None:
     workspace = _load_workspace(workspace_id)
+    toast = st.session_state.pop("wa_owner_toast", None)
+    if toast:
+        st.success(toast)
     page_header(workspace.get("name", workspace_id), "Manage")
 
     st.session_state.setdefault("wa_manage_section", "Knowledge")

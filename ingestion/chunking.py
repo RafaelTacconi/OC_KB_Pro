@@ -14,11 +14,13 @@ Section 11a testing that it causes real retrieval misses.
 
 from __future__ import annotations
 
-WORDS_TO_TOKENS = 1.3  # rough English heuristic, used consistently across the app
+# WORDS_TO_TOKENS and estimate_tokens are defined once in models/context_budget.py
+# (SPEC §7.8) and imported here. chunk_text keeps its own FRACTIONAL
+# per-paragraph accumulation using WORDS_TO_TOKENS and casts once at finalize —
+# switching to per-paragraph integer rounding here would shift chunk boundaries.
+from models.context_budget import WORDS_TO_TOKENS, estimate_tokens
 
-
-def estimate_tokens(text: str) -> int:
-    return int(len(text.split()) * WORDS_TO_TOKENS)
+__all__ = ["WORDS_TO_TOKENS", "estimate_tokens", "chunk_text", "build_embedding_text"]
 
 
 def chunk_text(

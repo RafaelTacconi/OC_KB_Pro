@@ -22,7 +22,7 @@ from config import APP_TITLE, DEFAULT_WORKSPACE_ID, TEST_USERS, bootstrap, creat
 from models.credentials import api_key_status
 from ui.chat_view import render_chat_view
 from ui.owner_view import render_owner_view
-from ui.pills import pill, render as render_pill
+from ui.pills import ROLE_PILL_MAP, pill, render as render_pill
 from ui.theme import inject_tokens, page_icon_path, render_brand
 
 st.set_page_config(
@@ -35,11 +35,6 @@ st.set_page_config(
 bootstrap()  # idempotent: init_db + migrate + seed_users + seed_default_workspace
 
 inject_tokens()
-
-ROLE_PILL_MAP = {
-    "owner": ("green", "\u25c6"),   # ◆
-    "member": ("gray", "\u25cf"),   # ●
-}
 
 
 def _load_visible_workspaces(user_id: str) -> list[dict]:

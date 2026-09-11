@@ -98,3 +98,54 @@ def test_build_prompt_respects_token_budget():
 
 def test_estimate_tokens_heuristic():
     assert estimate_tokens("one two three four") == int(4 * 1.3)
+
+
+def test_chunk_boundaries_unchanged_after_dedupe():
+    """SPEC §7.8 estimate_tokens de-dupe must NOT change chunk boundaries.
+
+    chunk_text accumulates fractional tokens per paragraph and casts once at
+    finalize. If the de-dupe had switched to per-paragraph integer rounding,
+    chunk boundaries would shift (the +/-60 tolerance in
+    test_chunk_text_respects_target_size might not catch it). Pin the exact
+    boundary layout across many paragraph sizes.
+    """
+    from ingestion.chunking import chunk_text
+    from models.context_budget import estimate_tokens as budget_est
+    from ingestion.chunking import estimate_tokens as chunk_est
+
+    # The two exposed functions are the SAME one now (de-duped).
+    assert chunk_est is budget_est
+
+    # Paragraphs sized to stress the boundary decision: word counts that, at
+    # 1.3 words/token, sit right around the 400-token target.
+    word_counts = [310, 310, 310, 308, 308, 155, 155]
+    paras = [" ".join(["w"] * n) for n in word_counts]
+    text = "\n\n".join(paras)
+    before = _reference_chunk_text(text)
+    after = chunk_text(text, target_tokens=400)
+
+    assert len(after) == len(before)
+    for a, b in zip(after, before):
+        assert a["text"] == b["text"]
+        assert a["token_count"] == b["token_count"]
+
+
+def _reference_chunk_text(text: str):
+    """Recompute chunking exactly as the pre-dedupe code did, to compare."""
+    WORDS_TO_TOKENS = 1.3
+    target = 400
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    chunks = []
+    current = []
+    current_tokens = 0.0
+    for para in paragraphs:
+        para_tokens = len(para.split()) * WORDS_TO_TOKENS
+        if current_tokens + para_tokens > target and current:
+            chunks.append((list(current), int(current_tokens)))
+            current = []
+            current_tokens = 0.0
+        current.append(para)
+        current_tokens += para_tokens
+    if current:
+        chunks.append((list(current), int(current_tokens)))
+    return [{"text": "\n\n".join(c), "token_count": t} for c, t in chunks]

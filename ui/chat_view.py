@@ -627,6 +627,14 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
             "be less complete."
         )
 
+    # --- §7.6 inline note: a free-text send cleared the Task prompt ---------
+    if st.session_state.pop(f"wa_task_cleared_note_{workspace_id}", None):
+        st.info(
+            "The selected task was not applied to your question — it was "
+            "answered as a plain free-text question. Select the task again to "
+            "run it."
+        )
+
     # --- Predefined tasks (constraint 7: no live "/" autocomplete) ----------
     tasks = _load_tasks(workspace_id)
     active_task = _render_task_row(workspace_id, tasks)
@@ -650,6 +658,17 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
     # --- Free-form chat input -------------------------------------------------
     user_question = st.chat_input("Type your question...")
     if user_question:
+        # SPEC §7.6 (option a): a free-text send while a Task is selected sends
+        # an UNTAGGED message — clear the selection and note inline that the
+        # Task prompt was not applied, so the user isn't misled (the task chip
+        # no longer stays selected).
+        if active_task is not None:
+            st.session_state[f"selected_task_{workspace_id}"] = None
+            _noted_task_cleared = True
+        else:
+            _noted_task_cleared = False
         _answer(workspace_id, user_id, user_question, selected_model_id,
                 chat_id=active_chat_id)
+        if _noted_task_cleared:
+            st.session_state[f"wa_task_cleared_note_{workspace_id}"] = True
         st.rerun()

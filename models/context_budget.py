@@ -35,10 +35,16 @@ MAX_RETRIEVED_TOKENS = 3000  # retrieval-quality ceiling — see module docstrin
 # headroom given every selectable model's context window is ~256k.
 RESPONSE_RESERVE_TOKENS = 4000
 
+# Rough English token heuristic used consistently across the app. Defined here
+# once (SPEC §7.8) and imported by ingestion/chunking.py (which also uses it
+# for its fractional per-paragraph accumulation — see there).
+WORDS_TO_TOKENS = 1.3
+
 
 def estimate_tokens(text: str) -> int:
-    """Same rough heuristic used everywhere else in the app (Section 7.3/9.2)."""
-    return int(len(text.split()) * 1.3)
+    """Rough heuristic: int(word_count * WORDS_TO_TOKENS). Defined once here
+    (SPEC §7.8); re-exported by ingestion.chunking for back-compat."""
+    return int(len(text.split()) * WORDS_TO_TOKENS)
 
 
 def fits_in_context(total_prompt_tokens: int, model_context_window: int) -> bool:

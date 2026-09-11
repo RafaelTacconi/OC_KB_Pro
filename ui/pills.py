@@ -15,6 +15,13 @@ import streamlit as st
 _VALID = {"green", "red", "orange", "blue", "gray"}
 _DEFAULT_GLYPH = "\u25cf"  # ●
 
+# Role pill mapping (SPEC §7.8 de-dupe): used by app.py and ui/owner_view.py.
+# Keep this leaf module free of any other import.
+ROLE_PILL_MAP = {
+    "owner": ("green", "\u25c6"),   # ◆
+    "member": ("gray", "\u25cf"),   # ●
+}
+
 
 def pill(value: str, class_map: dict[str, tuple[str, str]], default: str = "gray") -> str:
     """value: the real status string. class_map: {value: (family, glyph)}."""

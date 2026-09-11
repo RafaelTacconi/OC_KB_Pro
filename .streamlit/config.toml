@@ -6,10 +6,8 @@
 # locks the app to one mode.
 #
 # Font stack uses "Inter" with a system-font fallback chain (see assets/tokens.css) rather
-# than self-hosted @font-face files: no licensed .woff2 binaries ship in this PoC. Drop real
-# Inter/Inter Tight/JetBrains Mono files into static/fonts/ and add [[theme.fontFaces]]
-# blocks (see static/fonts/README.md) for pixel-perfect typography later — the app looks
-# clean either way because every custom element also falls back through the same stack.
+# than self-hosted @font-face files: no licensed .woff2 binaries ship in this PoC. The app
+# looks clean because every custom element falls back through the same stack.
 
 [theme]
 font           = "sans serif"

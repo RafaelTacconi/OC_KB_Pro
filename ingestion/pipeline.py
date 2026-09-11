@@ -114,6 +114,12 @@ def delete_source(source_id: str) -> None:
         ).fetchall()
         rowids = [r["rowid"] for r in rows]
 
+        # ORDERING IS REQUIRED (SPEC §7.7): chunks_fts is an external-content
+        # FTS5 table (`content='chunks'`), so deleting an index row reads the
+        # content row to determine which terms to remove. DELETE FTS rows
+        # FIRST, while the chunks rows still exist; deleting chunks first
+        # would silently corrupt the index. Any future bulk/Workspace delete
+        # must preserve this order.
         for rowid in rowids:
             conn.execute("DELETE FROM chunks_fts WHERE rowid = ?", (rowid,))
 
