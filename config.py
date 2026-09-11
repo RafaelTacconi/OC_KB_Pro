@@ -143,10 +143,10 @@ def seed_default_workspace() -> None:
 
 def create_workspace(name: str, instructions: str, owner_user_id: str) -> str:
     """
-    Create a Workspace owned by `owner_user_id`. Per SPEC §5.3 interim, EVERY
-    entry in TEST_USERS is added as a member — mirroring the seed behaviour
-    (OPEN-4 interim; an Owner cannot create a private Workspace). Returns the
-    new workspace_id.
+    Create a Workspace owned by `owner_user_id`. OPEN-4 is CLOSED by the
+    per-Workspace membership build (level (a)): only the creating OWNER is
+    added as a member — NOT every TEST_USER (supersedes the §5.3 interim).
+    Other members are added via Manage → Users. Returns the new workspace_id.
     """
     workspace_id = uuid.uuid4().hex
     now = _now()
@@ -159,16 +159,42 @@ def create_workspace(name: str, instructions: str, owner_user_id: str) -> str:
             """,
             (workspace_id, name, owner_user_id, instructions, now, now),
         )
-        for user in TEST_USERS:
-            conn.execute(
-                """
-                INSERT INTO workspace_members (workspace_id, user_id)
-                VALUES (?, ?)
-                ON CONFLICT DO NOTHING
-                """,
-                (workspace_id, user["user_id"]),
-            )
+        conn.execute(
+            """
+            INSERT INTO workspace_members (workspace_id, user_id)
+            VALUES (?, ?)
+            """,
+            (workspace_id, owner_user_id),
+        )
     return workspace_id
+
+
+def add_member(workspace_id: str, user_id: str) -> None:
+    """Per-Workspace membership (OPEN-4 closed): admit a user to this Workspace."""
+    with transaction() as conn:
+        conn.execute(
+            """
+            INSERT INTO workspace_members (workspace_id, user_id)
+            VALUES (?, ?)
+            ON CONFLICT DO NOTHING
+            """,
+            (workspace_id, user_id),
+        )
+
+
+def remove_member(workspace_id: str, user_id: str) -> None:
+    """Per-Workspace membership (OPEN-4 closed): revoke a user's access.
+    Does nothing if the user is the Workspace Owner — an Owner-less Workspace
+    is invalid (no one could manage it)."""
+    with transaction() as conn:
+        conn.execute(
+            """
+            DELETE FROM workspace_members
+            WHERE workspace_id = ? AND user_id = ?
+              AND user_id != (SELECT owner_user_id FROM workspaces WHERE workspace_id = ?)
+            """,
+            (workspace_id, user_id, workspace_id),
+        )
 
 
 def bootstrap() -> None:

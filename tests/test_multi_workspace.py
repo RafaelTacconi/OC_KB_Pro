@@ -84,10 +84,9 @@ def test_a1_owner_creates_workspace_and_it_is_selected(
     ws_selectbox = _workspace_selectbox(at)
     assert "HR Workspace" in ws_selectbox.options
     assert ws_selectbox.value == hr["workspace_id"]
-    # Membership per §5.3 interim: every TEST_USER.
-    assert set(_memberships(db_path, hr["workspace_id"])) == {
-        "u_owner", "u_member1", "u_member2",
-    }
+    # OPEN-4 closed (level (a)): a new Workspace is owned by its creator only —
+    # NOT auto-added to every TEST_USER. Members are added via Manage -> Users.
+    assert set(_memberships(db_path, hr["workspace_id"])) == {"u_owner"}
 
 
 def test_a4_switch_clears_task_and_active_chat(
@@ -134,19 +133,38 @@ def test_a5_member_sees_only_their_workspaces_and_no_manage(
     assert not at.exception
     db_path = tmp_path / "data" / "workspace_app.db"
 
-    # Owner creates a workspace (adds ALL users as members per §5.3 interim).
+    # Owner creates a workspace (OPEN-4 closed: only the Owner is added).
     at.sidebar.text_input(key="new_workspace_name").set_value("HR Workspace")
     at.sidebar.button(key="new_workspace_submit").click().run()
 
-    # Switch to a member — they are a member of every workspace (interim rule),
-    # so the switcher lists all, and there is NO Manage button.
+    # The member is NOT a member of HR, so they see only AML — and no Manage.
     at.sidebar.selectbox[0].set_value("u_member1").run()
     assert not at.exception
     ws_selectbox = _workspace_selectbox(at)
-    assert set(ws_selectbox.options) == {"AML Workspace", "HR Workspace"}
-    # No Manage button for a member (A5).
+    assert set(ws_selectbox.options) == {"AML Workspace"}
     has_manage = any(b.key == "nav_manage" for b in at.sidebar.button)
     assert not has_manage
+
+    # Owner adds the member via Manage -> Users (OPEN-4 membership build).
+    at.sidebar.selectbox[0].set_value("u_owner").run()
+    hr_id = next(w["workspace_id"] for w in _workspace_names(db_path)
+                 if w["name"] == "HR Workspace")
+    # Ensure the Owner is viewing HR (switching users reset the switcher to AML).
+    _workspace_selectbox(at).set_value(hr_id).run()
+    at.button(key="nav_manage").click().run()
+    at.radio(key="wa_manage_section").set_value("Users").run()
+    # The add-member selectbox lists only non-members of the current (HR)
+    # workspace. Since HR is owner-only, u_member1 is an option.
+    add_sel = at.selectbox(key=f"add_member_{hr_id}")
+    assert "Priya (Member)" in add_sel.options  # u_member1, display label
+    add_sel.set_value("Priya (Member)").run()
+    at.button(key=f"add_member_btn_{hr_id}").click().run()
+    assert not at.exception
+
+    # Now the member sees HR too.
+    at.sidebar.selectbox[0].set_value("u_member1").run()
+    ws_selectbox = _workspace_selectbox(at)
+    assert set(ws_selectbox.options) == {"AML Workspace", "HR Workspace"}
 
 
 def test_a6_branding_uses_workspace_name(monkeypatch, tmp_path):

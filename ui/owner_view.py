@@ -20,6 +20,7 @@ from pathlib import Path
 import streamlit as st
 
 from db import get_connection, transaction
+from config import add_member, remove_member
 from ingestion.pipeline import delete_source, ingest_source
 from ui.cards import kpi_row
 from ui.pills import ROLE_PILL_MAP, pill, render as render_pill
@@ -366,21 +367,53 @@ def _render_tasks_section(workspace_id: str) -> None:
 def _render_users_section(workspace_id: str) -> None:
     st.subheader("Users")
     st.caption(
-        "Who has access to this Workspace. This PoC uses a fixed test-user list "
-        "(constraint 6) — invite/remove isn't wired up yet."
+        "Who can access this Workspace. This PoC uses a fixed test-user list "
+        "(constraint 6) — but the OWNER can now add/remove members per "
+        "Workspace (OPEN-4 closed). The Owner cannot be removed."
     )
     members = _load_members(workspace_id)
+    member_ids = {m["user_id"] for m in members}
     with st.container(border=True):
         for i, member in enumerate(members):
-            cols = st.columns([4, 2], vertical_alignment="center")
+            cols = st.columns([4, 2, 1], vertical_alignment="center")
             cols[0].markdown(f"**{member['display_name']}**")
             with cols[1]:
                 render_pill(pill(member["role"].capitalize(), {
                     "Owner": ROLE_PILL_MAP["owner"],
                     "Member": ROLE_PILL_MAP["member"],
                 }))
+            # Remove (non-owner) members. Owner is not removable.
+            can_remove = member["role"] != "owner"
+            if cols[2].button(
+                "Remove" if can_remove else "",
+                key=f"remove_member_{workspace_id}_{member['user_id']}",
+                use_container_width=True,
+                disabled=not can_remove,
+            ):
+                remove_member(workspace_id, member["user_id"])
+                st.rerun()
             if i < len(members) - 1:
                 st.divider()
+
+    # Add a member: pick from TEST_USERS not already in this Workspace.
+    from config import TEST_USERS
+
+    available = [u for u in TEST_USERS if u["user_id"] not in member_ids]
+    if available:
+        with st.container(border=True):
+            add_labels = {u["user_id"]: u["display_name"] for u in available}
+            sel_user = st.selectbox(
+                "Add member",
+                options=[u["user_id"] for u in available],
+                format_func=lambda uid: add_labels[uid],
+                key=f"add_member_{workspace_id}",
+            )
+            if st.button("Add member", key=f"add_member_btn_{workspace_id}",
+                         type="primary"):
+                add_member(workspace_id, sel_user)
+                st.rerun()
+    else:
+        st.caption("Every test user is already a member of this Workspace.")
 
 
 # ---------------------------------------------------------------------------------------
