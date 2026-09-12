@@ -7,6 +7,27 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Offline evaluation result: 15/15 + negative control
+
+Owner ran a hand-built question set against the real corpora (AML, Security
+Incident, HR Grievance domains):
+
+- **15 of 15 correct**, plus the negative control (a question with no supporting
+  source — answered as "not in the sources", not invented).
+- Includes **Q14, a two-step spreadsheet read** (an answer that required
+  combining two facts across the XLSX content), which was correct.
+
+This is the first end-to-end evidence that the pipeline (hybrid retrieval →
+prompt → live model) produces grounded, correct answers against real
+documents. It also surfaced six issues (citation-title quality, chip accuracy/
+duplication, history model label, spinner timing) addressed in the entries that
+follow.
+
+**Schema and migration changes**
+- None.
+
+---
+
 ## 2026-09-11 — UI review pass + OPEN-4 closed (per-Workspace membership)
 
 Two owner-directed workstreams after the real-corpus findings.
