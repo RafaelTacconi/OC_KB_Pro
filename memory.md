@@ -321,6 +321,28 @@ pypdf fallback for PDFs. Not built 2026-09-11; the owner reported it and the rea
 AML_Policy.pdf is gone (data/ was cleaned), so no repro file exists. The citation
 section text is a UX trust problem — a wrong "section 3" undermines citations.
 
+### 2026-09-11 — unstructured PDF headings: trust SHAPE, not element type
+`unstructured.partition_pdf` is unreliable for heading detection on real PDFs:
+it labels wrapped body sentence FRAGMENTS as `Title` ("Financial Crime
+Oversight Committee.", "channel for Severity 1.", "than 15 minutes.") while the
+REAL numbered section headings arrive as `ListItem` ("1. Scope", "2. Escalation
+Timeline"). Keying section titles on `Title`/`Header` alone therefore picks
+exactly the wrong elements. Fix (built): `_looks_like_heading` classifies by
+shape — a numbered pattern (`^\d+(?:\.\d+)*[.)]?\s+\S`) is a heading whatever
+its type; a `Title`/`Header` is a heading only if short, not ending in `.`, and
+starting uppercase/digit. Heuristic; validated against the observed element
+stream in `tests/test_parser_headings.py`. A doc with un-numbered or
+sentence-style headings could still misclassify — revisit if the real corpus
+shows it.
+
+### 2026-09-11 — Expiry tests used the LOCAL date; production uses UTC
+`models/credentials.py::api_key_status()` compares against
+`datetime.now(timezone.utc).date()`. The expiry tests in
+`tests/test_provider_config.py` built their dates with `date.today()` (local),
+so they failed by one day whenever the machine's local date was ahead of UTC.
+Fixed with a `_utc_today()` helper. Rule: any test touching date-based status
+must use the SAME clock the production code uses (UTC).
+
 ### 2026-09-11 — root cause: the conftest `data/` guard vs the running app — you only delete what is safe once the guard can't mislead
 The repo `data/` directory was deleted TWICE this session (once for the conftest
 "no data/ at repo root" assertion, once by an over-broad `Remove-Item -Force

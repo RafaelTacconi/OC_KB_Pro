@@ -7,6 +7,52 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-11 — Test follow-ups: 5 fixes built, export/timestamps scoped
+
+After the 15/15 offline run, six issues were filed. Five are built; #6 is scoped.
+
+**#4 — real model in history (was picker-only).** `_model_display_name()` now
+appends the `.env` slug, matching the picker: "Standard (openai/gpt-4o)";
+raw-id fallback preserved.
+
+**#2 — citation chips mislabeled.** The chip row is the RETRIEVED set, not the
+model's inline citations. Relabeled with a "Retrieved from" heading
+(owner-approved option) so it stops claiming to be citations.
+
+**#3 — duplicate chips.** `source_chips()` dedupes by
+`(display_name, section_title)`.
+
+**#1 — PDF section titles were body fragments.** Root cause: `partition_pdf`
+labels wrapped sentence fragments as `Title` ("Financial Crime Oversight
+Committee.", "channel for Severity 1.") while the REAL numbered headings arrive
+as `ListItem` ("1. Scope"). `_group_unstructured_elements` keyed on element
+TYPE only. Fixed by shape-based classification (`_looks_like_heading`): numbered
+pattern → heading; `Title`/`Header` → heading only if short, no trailing period,
+uppercase/digit start. Regression test `tests/test_parser_headings.py` (5).
+
+**#5 — spinner gap.** The spinner wrapped only `_run_turn`, then closed before
+the caller's rerun painted the answer. `_answer` now renders the user + assistant
+bubbles INLINE with the spinner inside the assistant bubble, so it transitions
+straight into the answer; the rerun re-renders the identical turn.
+
+**Incidental fix:** the expiry tests used `date.today()` (local) while
+`api_key_status()` uses the UTC date — off by one when local time is ahead of
+UTC. Tests now use `_utc_today()`.
+
+**#6 — export chat + message timestamps: SCOPED ONLY** (not built).
+- Timestamps: display-only; `chat_messages.created_at` exists. Touches
+  `ui/chat_view.py` + a formatter. Needs a UTC-vs-local display decision.
+- Export: a `download_button` serialising each turn (question, answer,
+  citations, model, timestamp). Touches a new `ui/export.py` + `chat_view.py`.
+  Needs format (Markdown/JSON/CSV) and a privacy call (it egresses Q&A).
+
+**Schema and migration changes**
+- None.
+
+**Tests:** 67 → 72 passed.
+
+---
+
 ## 2026-09-11 — Offline evaluation result: 15/15 + negative control
 
 Owner ran a hand-built question set against the real corpora (AML, Security
