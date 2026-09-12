@@ -224,7 +224,7 @@ def _run_turn(
     user_input: str,
     model_id: str,
     task: dict | None = None,
-) -> bool:
+) -> tuple[bool, str, list[dict]]:
     """
     Retrieval + prompt assembly + model call + assistant-message persistence.
     Deliberately free of Streamlit (SPEC.md §7.1) so the caller owns the
@@ -234,10 +234,11 @@ def _run_turn(
     `chat_id` is REQUIRED — the Chat already exists (created with the user's
     persisted first message); the assistant message persists into it.
 
-    Returns True when the turn ran with degraded retrieval — semantic search
-    was unavailable and the answer is grounded in lexical (keyword) results
-    only (SPEC.md §7.3); the caller surfaces the visible note. Returns False
-    when both lexical and semantic retrieval were available.
+    Returns (degraded, answer_text, cited_sources). `degraded` is True when
+    semantic search was unavailable and the answer is grounded in lexical
+    results only (SPEC.md §7.3). Returning the answer text lets the caller
+    render it INLINE (issue #5) so the spinner transitions straight into the
+    answer instead of closing before the rerun paints it.
     """
     workspace = _load_workspace(workspace_id)
 
@@ -271,7 +272,7 @@ def _run_turn(
         task_id=task["task_id"] if task else None,
         model_id=model_id,
     )
-    return degraded
+    return degraded, answer_text, cited_sources
 
 
 def _stash_error(workspace_id: str, user_id: str, chat_id: str, user_input: str,
@@ -285,6 +286,17 @@ def _stash_error(workspace_id: str, user_id: str, chat_id: str, user_input: str,
         "task": task,
         "error": str(exc),
     }
+
+
+def _render_answer_body(answer_text: str, cited_sources: list[dict], model_id: str) -> None:
+    """The body of an assistant bubble: answer text, retrieved-source chips,
+    and model attribution. Shared by the inline send render and (for the same
+    visual result) the history render."""
+    st.write(answer_text)
+    if cited_sources:
+        source_chips(cited_sources, heading="Retrieved from")
+    if model_id:
+        st.caption(f"Model: {_model_display_name(model_id)}")
 
 
 def _answer(
@@ -314,6 +326,10 @@ def _answer(
          persisted.
       4. A successful turn that had to degrade to lexical-only retrieval (§7.3)
          sets wa_semantic_degraded so the chat view shows a visible note.
+      5. Issue #5: the answer is rendered INLINE inside the spinner, so the
+         spinner transitions straight into the answer. Previously the spinner
+         closed before the caller's rerun rendered the answer, leaving a silent
+         gap that looked like a failed send.
     """
     _clear_pending_error()
     st.session_state.pop("wa_semantic_degraded", None)
@@ -323,9 +339,16 @@ def _answer(
     )
     st.session_state["wa_chat_id"] = chat_id
 
+    with st.chat_message("user"):
+        st.write(user_input)
+
     try:
-        with st.spinner("Thinking..."):
-            degraded = _run_turn(workspace_id, user_id, chat_id, user_input, model_id, task=task)
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                degraded, answer_text, cited = _run_turn(
+                    workspace_id, user_id, chat_id, user_input, model_id, task=task
+                )
+            _render_answer_body(answer_text, cited, model_id)
     except Exception as exc:  # noqa: BLE001 - see §7.1
         _stash_error(workspace_id, user_id, chat_id, user_input, model_id, task, exc)
         return
@@ -344,15 +367,17 @@ def _retry() -> None:
     _clear_pending_error()
     st.session_state.pop("wa_semantic_degraded", None)
     try:
-        with st.spinner("Thinking..."):
-            degraded = _run_turn(
-                payload["workspace_id"],
-                payload["user_id"],
-                payload["chat_id"],
-                payload["user_input"],
-                payload["model_id"],
-                task=payload.get("task"),
-            )
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                degraded, answer_text, cited = _run_turn(
+                    payload["workspace_id"],
+                    payload["user_id"],
+                    payload["chat_id"],
+                    payload["user_input"],
+                    payload["model_id"],
+                    task=payload.get("task"),
+                )
+            _render_answer_body(answer_text, cited, payload["model_id"])
     except Exception as exc:  # noqa: BLE001
         _stash_error(
             payload["workspace_id"], payload["user_id"], payload["chat_id"],
