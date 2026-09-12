@@ -4,10 +4,28 @@ ui/cards.py — small reusable rendering helpers shared by chat_view and owner_v
 from __future__ import annotations
 
 import html
+from datetime import datetime, timezone
 
 import streamlit as st
 
 _HERO_GREEN = "#00965A"
+
+
+def format_local_time(created_at: str) -> str:
+    """
+    Display-only local-time rendering of a stored UTC ISO timestamp (SPEC §16.1).
+    Storage stays UTC; this converts to the user's local time for the UI. Naive
+    timestamps are treated as UTC. Returns "" on an unparseable value.
+    """
+    if not created_at:
+        return ""
+    try:
+        dt = datetime.fromisoformat(created_at)
+    except (TypeError, ValueError):
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone().strftime("%Y-%m-%d %H:%M")
 
 
 def kpi_row(items: list[tuple[str, str]]) -> None:
@@ -24,19 +42,20 @@ def kpi_row(items: list[tuple[str, str]]) -> None:
             )
 
 
-def source_chips(sources: list[dict], heading: str | None = None) -> None:
+def chips_html(sources: list[dict], heading: str | None = None) -> str:
     """
-    Renders the chips shown under an assistant chat message.
+    Build the HTML for the chips shown under an assistant message.
 
     `sources` is the RETRIEVED chunk set (output of hybrid_search), not
     necessarily what the model cited inline — so the caller passes a heading
     ("Retrieved from") to avoid claiming these are the model's citations
     (issue #2). Chips are deduped by (display_name, section_title) so two
     chunks from the same document section render once (issue #3).
-    sources: list of {"display_name": ..., "section_title": ...(optional)}.
+
+    Pure (no Streamlit) so it is unit-testable; `source_chips` renders it.
     """
     if not sources:
-        return
+        return ""
     seen: set[tuple] = set()
     chips = []
     for s in sources:
@@ -54,7 +73,15 @@ def source_chips(sources: list[dict], heading: str | None = None) -> None:
     heading_html = (
         f'<div class="wa-chip-heading">{html.escape(heading)}</div>' if heading else ""
     )
-    st.html(f'{heading_html}<div class="wa-pill-row">{"".join(chips)}</div>')
+    return f'{heading_html}<div class="wa-pill-row">{"".join(chips)}</div>'
+
+
+def source_chips(sources: list[dict], heading: str | None = None) -> None:
+    """Render `chips_html(...)` (see there for the retrieved-vs-cited and
+    dedupe semantics)."""
+    html_str = chips_html(sources, heading)
+    if html_str:
+        st.html(html_str)
 
 
 def empty_state(text: str) -> None:

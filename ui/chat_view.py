@@ -27,7 +27,8 @@ from models.registry import DEFAULT_MODEL_ID, get_model_spec, list_models, provi
 from models.router import call_model
 from prompting.assemble import build_prompt
 from retrieval.hybrid_search import hybrid_search
-from ui.cards import source_chips
+from ui.cards import format_local_time, source_chips
+from ui.export import chat_to_markdown
 from ui.theme import page_header
 
 
@@ -693,15 +694,25 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
         )
     for msg in history:
         with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-            if msg["role"] == "assistant" and msg.get("cited_sources"):
-                source_chips(json.loads(msg["cited_sources"]), heading="Retrieved from")
-            # SPEC §7.5 — model attribution. Fall back to the raw model_id
-            # when it's no longer in the registry (Step-6 item 1: blanking a
-            # .env slug hides a model from the picker but historical rows
-            # still carry it).
-            if msg["role"] == "assistant" and msg.get("model_id"):
-                st.caption(f"Model: {_model_display_name(msg['model_id'])}")
+            if msg["role"] == "assistant":
+                cited = json.loads(msg["cited_sources"]) if msg.get("cited_sources") else []
+                _render_answer_body(msg["content"], cited, msg.get("model_id"))
+            else:
+                st.write(msg["content"])
+            # SPEC §16.1 — timestamp, displayed in LOCAL time (stored UTC).
+            ts = format_local_time(msg.get("created_at", ""))
+            if ts:
+                st.caption(ts)
+
+    # --- Export the active Chat as Markdown (SPEC §16.2) --------------------
+    if active_chat_id and history:
+        st.download_button(
+            "Export chat (.md)",
+            data=chat_to_markdown(active_chat.get("title", "Chat"), history),
+            file_name=f"chat-{active_chat_id[:8]}.md",
+            mime="text/markdown",
+            key=f"export_chat_{active_chat_id}",
+        )
 
     # --- Pending turn error (SPEC.md §7.1) rendered as the latest bubble ----
     _render_pending_error(workspace_id, user_id, active_chat_id)
