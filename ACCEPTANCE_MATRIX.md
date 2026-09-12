@@ -1,16 +1,16 @@
-# Acceptance matrix — A1–A25
+# Acceptance matrix — A1–A34
 
-Verified 2026-09-11 against `68dcd3a` + follow-ups (all of Steps 1–7 complete;
-Step 8 not started). Method: each criterion is mapped to the test(s) that prove
-it, or is marked *not verifiable* with the reason. The full suite (56 passed)
-runs from a clean clone: `git clone` → fresh venv →
-`pip install -r requirements.txt` → `python -m pytest tests/ -q` → **56 passed**.
+Verified 2026-09-13 against current `main` (Steps 1–7 complete, §14/§15/§16
+work; Step 8 not started). Method: each criterion is mapped to the test(s) that
+prove it, or is marked *not verifiable* with the reason. The full suite
+(**78 passed**) runs from a clean clone: `git clone` → fresh venv →
+`pip install -r requirements.txt` → `python -m pytest tests/ -q`.
 
 ## Multi-Workspace (SPEC §5)
 
 | # | Criterion | Proof | Status |
 |---|---|---|---|
-| A1 | Owner creates a Workspace; it appears in the switcher and is selected | `tests/test_multi_workspace.py::test_a1_owner_creates_workspace_and_it_is_selected` (AppTest: create → appears + selected; membership = all TEST_USERS) | ✅ |
+| A1 | Owner creates a Workspace; it appears in the switcher and is selected | `tests/test_multi_workspace.py::test_a1_owner_creates_workspace_and_it_is_selected` (AppTest: create → appears + selected; membership = creator only per OPEN-4 build) | ✅ |
 | A2 | Uploading to Workspace A never retrieved in B | `tests/test_workspace_isolation.py` — retrieval layer, lexical + semantic + hybrid each asserted to return nothing across the boundary (embedder stubbed; verifies the `workspace_id` filter, not ranking) | ✅ |
 | A3 | Instructions/Tasks in A don't appear/apply in B | `tests/test_multi_workspace.py::test_a3_instructions_and_tasks_do_not_leak` (AppTest: create Workspace B, give it its own Instructions + Task, verify Workspace A's chat still shows A's Instructions applied and only A's Tasks; and vice-versa) | ✅ |
 | A4 | Switching Workspace clears Task + active Chat | `tests/test_multi_workspace.py::test_a4_switch_clears_task_and_active_chat` | ✅ |
@@ -54,6 +54,26 @@ timeouts mid-stream) is unverified until a live `.env` endpoint exists.
 | A23 | 30d → none; past → everyone red; unset/malformed → `unknown` no raise | `tests/test_provider_config.py::test_status_*` (ok/expiring/zero/expired/boundary/unknown/never-raises) | ✅ |
 | A24 | `.env` git-ignored; `.env.example` committed; no key/base URL in history | Verified: `git log --all --full-history -- .env` → empty; full-object scan → only `.env.example` ever committed (empty template) | ✅ |
 | A25 | `call_model()` signature unchanged; `test_chat_error_handling.py` still passes | Both hold (test monkeypatches `ui.chat_view.call_model` and still passes) | ✅ |
+
+## Parsing, citations, answer rendering (SPEC §7.10–§7.13)
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A29 | Headings classified by SHAPE, not element type; body fragments never become section titles | `tests/test_parser_headings.py` (5: numbered→heading, fragments rejected, grouping, DOCX real titles) | ✅ *see caveat* |
+| A30 | Chip row labelled "Retrieved from" (retrieved set, not the model's citations) | `tests/test_citations_timestamps_export.py::test_a30_chip_row_is_labelled_retrieved_from` | ✅ |
+| A31 | Chips deduped by `(display_name, section_title)` | `tests/test_citations_timestamps_export.py::test_a31_chips_dedupe_by_name_and_section` | ✅ |
+| A32 | Answer renders on send (inline render; spinner becomes the answer) | `tests/test_citations_timestamps_export.py::test_a32_send_renders_answer` + code inspection of `_answer` (spinner inside the assistant bubble) | ✅ |
+
+**⚠ A29 caveat:** the shape heuristic is validated only against the synthetic
+corpus, **not against real back-office documents** (see `memory.md`). Re-check
+against the real corpus before citations are trusted.
+
+## Message timestamps and chat export (SPEC §16)
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A33 | Every message shows a timestamp; stored UTC, displayed local; no schema change | `tests/test_citations_timestamps_export.py::test_a33_format_local_time_converts_from_utc`, `test_a33_and_a34_seeded_chat_shows_timestamp_and_export` | ✅ |
+| A34 | Markdown export of the active Chat: question, answer, sources, model, timestamp | `tests/test_citations_timestamps_export.py::test_a34_chat_to_markdown_contains_all_fields`, `test_a33_and_a34_seeded_chat_shows_timestamp_and_export` | ✅ |
 
 ## Not verifiable without owner inputs
 

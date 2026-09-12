@@ -7,7 +7,39 @@ A step with no entry here is not done.
 
 ---
 
-## 2026-09-11 — Test follow-ups: 5 fixes built, export/timestamps scoped
+## 2026-09-13 — SPEC write-up for the fixes + item 6 built (timestamps, export)
+
+**Spec-before-build correction.** The four behaviour changes shipped earlier
+without a SPEC entry; added now, no renumbering:
+- **§7.10** heading classification (shape-based) + §7.11 chip row is the
+  RETRIEVED set, labelled "Retrieved from" + §7.12 chip dedupe + §7.13 inline
+  render (spinner becomes the answer).
+- **§16** message timestamps (UTC stored, local displayed) and Markdown chat
+  export.
+- **§10** new acceptance criteria **A29–A34**; `ACCEPTANCE_MATRIX.md` retitled
+  A1–A34 with proof rows.
+
+**Item 6 built** (owner decisions: display local time; Markdown; privacy yes):
+- `ui/cards.py::format_local_time()` — display-only local rendering of the
+  stored UTC `created_at`; no schema change.
+- `ui/export.py::chat_to_markdown()` — pure builder; per turn emits question,
+  answer, retrieved sources, model (display name + slug), timestamp.
+- `ui/chat_view.py` — timestamps on every message; an "Export chat (.md)"
+  download button for the active Chat.
+- Privacy recorded in `memory.md` as a conscious decision.
+
+**Also:** `source_chips` split into a pure `chips_html()` (unit-testable) +
+the st render.
+
+**Tests:** +`tests/test_citations_timestamps_export.py` (6: A30–A34).
+`tests/test_parser_headings.py` (5, A29). 72 → **78 passed**.
+
+**Schema and migration changes**
+- None.
+
+---
+
+## 2026-09-13 — Test follow-ups: 5 fixes built, export/timestamps scoped
 
 After the 15/15 offline run, six issues were filed. Five are built; #6 is scoped.
 
@@ -53,7 +85,7 @@ UTC. Tests now use `_utc_today()`.
 
 ---
 
-## 2026-09-11 — Offline evaluation result: 15/15 + negative control
+## 2026-09-13 — Offline evaluation result: 15/15 + negative control
 
 Owner ran a hand-built question set against the real corpora (AML, Security
 Incident, HR Grievance domains):

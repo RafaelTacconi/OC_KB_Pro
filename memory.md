@@ -335,6 +335,23 @@ stream in `tests/test_parser_headings.py`. A doc with un-numbered or
 sentence-style headings could still misclassify — revisit if the real corpus
 shows it.
 
+### 2026-09-13 — Heading heuristic is UNVALIDATED against real documents
+`_looks_like_heading` (numbered pattern / short / no trailing period /
+uppercase-or-digit start) was derived from the nine synthetic test files only.
+The real corpus is back-office **bank procedures**, whose heading styling is
+unknown. **Do NOT tune it further against the synthetic corpus.** It must be
+re-checked against real documents (and likely adjusted) before section citations
+are trusted. Until then, treat section titles as best-effort. See SPEC §7.10
+"A29 caveat".
+
+### 2026-09-13 — Chat export is a conscious privacy decision (SPEC §16.2)
+Building a Markdown **chat export** (A34) means internal procedure content —
+user questions, model answers, and cited source filenames — leaves the app as an
+**uncontrolled local file**. Accepted for this PoC because the owner runs it on
+their own machine. **Must be revisited before other people use the tool**, and
+before any deployment (OPEN-13). Recorded as a conscious decision, not a
+default.
+
 ### 2026-09-11 — Expiry tests used the LOCAL date; production uses UTC
 `models/credentials.py::api_key_status()` compares against
 `datetime.now(timezone.utc).date()`. The expiry tests in

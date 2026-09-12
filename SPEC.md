@@ -465,6 +465,40 @@ These are real but the draft accepts them or is silent. **Do not fix without a d
 - **No caching on read helpers.** No `st.cache_data`/`st.cache_resource` on `_load_workspace`, `_load_tasks`, `_load_history`, `_load_sources`, `_load_members`. Every widget interaction re-issues several queries. Fine at PoC scale; note that adding caching interacts badly with write-then-rerun flows and needs care.
 - **No response streaming.** The full answer arrives behind a blocking spinner.
 
+### 7.10 `[FIX]` Section titles came from body-text fragments, not headings
+
+**Where:** `ingestion/parsers.py::_group_unstructured_elements()` (shared by PDF and DOCX).
+
+**Current behaviour:** section titles were taken from any `unstructured` element whose type was `Title`/`Header`. On real documents `partition_pdf` labels wrapped body sentences as `Title` ("Financial Crime Oversight Committee.", "channel for Severity 1.", "than 15 minutes."), while the genuine numbered headings arrive as `ListItem` ("1. Scope", "2. Escalation Timeline"). So the provenance trail showed sentence fragments instead of headings.
+
+**Fix:** classify headings by SHAPE, not element type. A numbered-heading pattern (`^\d+(?:\.\d+)*[.)]?\s+\S`) is a heading whatever its element type; a `Title`/`Header` is a heading only if it is short, does not end with a sentence period, and starts with an uppercase letter or digit. Body fragments become body text.
+
+**Known limitation:** this is a heuristic; it is **unvalidated against real back-office documents** (validated only against the test corpus). See `memory.md`. Re-check before citations are trusted.
+
+### 7.11 `[FIX]` Citation chips claimed to be the model's citations
+
+**Where:** `ui/chat_view.py` (history render) + `ui/cards.py::source_chips()`.
+
+**Current behaviour:** the chip row under an answer rendered all retrieved chunks as if they were the model's inline citations; a one-chunk answer showed five chips.
+
+**Fix:** the row is labelled **"Retrieved from"** and presented as the RETRIEVED set. It is not the model's inline citations. (Populating from the model's free-text citations was rejected as fragile.)
+
+### 7.12 `[FIX]` Duplicate citation chips
+
+**Where:** `ui/cards.py::source_chips()`.
+
+**Current behaviour:** two retrieved chunks from the same document section produced two identical chips.
+
+**Fix:** dedupe chips by `(display_name, section_title)`.
+
+### 7.13 `[FIX]` Spinner disappeared before the answer arrived
+
+**Where:** `ui/chat_view.py::_answer()` / `_retry()`.
+
+**Current behaviour:** `st.spinner` wrapped only the model call; when it returned, the spinner closed and the answer appeared only after the caller's `st.rerun()` — a silent gap that looked like a failed send.
+
+**Fix:** render the turn inline — the spinner sits INSIDE the assistant `st.chat_message` bubble and the answer is written into that same bubble, so the spinner transitions directly into the answer; the caller's rerun then re-renders the identical turn from the DB.
+
 ---
 
 ## 8. Architecture rules for the implementing agent
@@ -581,6 +615,18 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A26. For each ingested PDF/DOCX, the `sources` row stores an `image_count` (the number of embedded images found during parsing); it is 0 or more and never blocks ingestion.
 - A27. In Manage → Knowledge, an Owner sees a per-file note "N images — their content is not indexed" whenever that file's `image_count > 0`.
 - A28. With no model configured, the chat `st.chat_input` and the task buttons are DISABLED (not hidden) so no message can be sent; the "No AI model is configured" warning is the single explanation, and no send ever fails with a raw `Unknown model_id None`.
+
+**Parsing and answer-presentation fixes** (§7.10–§7.13)
+
+- A29. Section titles are classified by SHAPE, not `unstructured` element type: a numbered heading (`1.`, `2.1`, `3)`) is a heading whatever its element type; a `Title`/`Header` is a heading only if it is short, does not end with a sentence period, and starts uppercase/digit. Body sentence fragments (e.g. "Financial Crime Oversight Committee.", "channel for Severity 1.") are body text, never section titles.
+- A30. The chip row under an assistant message is labelled "Retrieved from" and is presented as the RETRIEVED chunk set — it does not claim to be the model's inline citations.
+- A31. Chips are deduped by `(display_name, section_title)`, so two chunks from the same document section render once.
+- A32. The model-turn spinner sits INSIDE the assistant message bubble and transitions directly into the answer in the same render; the answer does not appear only after a separate rerun following the spinner's removal.
+
+**Message timestamps and chat export** (§16)
+
+- A33. Every message in the UI shows its timestamp; stored `created_at` remains UTC, and the displayed value is the user's local time. Display-only — no schema change.
+- A34. An Owner/user can export the active Chat as a Markdown file containing, per turn, the question, the answer, the retrieved sources, the model (display name + slug), and the timestamp.
 
 ---
 
@@ -906,3 +952,37 @@ buttons are DISABLED (not hidden), so no send can occur. The existing warning is
 the single explanation — it reads as "fix your config", not "the app is broken".
 Disabling (rather than hiding) keeps the layout stable and signals the controls
 exist but are gated on configuration.
+
+---
+
+## 16. Message timestamps and chat export
+
+New features, added 2026-09-11 at the project owner's request. Tag conventions
+as per §0.1.
+
+### 16.1 Per-message timestamps `[NEW]`
+
+Every message shown in the chat view displays its timestamp. `chat_messages`
+already stores `created_at` as a UTC ISO string (SPEC §4.3); this is
+**display-only**: no schema change, and the stored value stays UTC. The UI
+converts to the user's **local time** for display only.
+
+- Touches `ui/chat_view.py::render_chat_view` (history loop and the inline
+  render) + a small formatter (e.g. in `ui/cards.py`).
+- The conversion happens in the UI layer only; `db.py`/`ingestion/` never
+  localise timestamps.
+
+### 16.2 Chat export as Markdown `[NEW]`
+
+The user can export the active Chat as a **Markdown** file. For each turn the
+export contains: the question, the answer, the retrieved sources ("Retrieved
+from"), the model (display name + `.env` slug), and the timestamp.
+
+- Touches a new `ui/export.py` (builds the Markdown from the Chat's messages)
+  and `ui/chat_view.py` (a `st.download_button` for the active Chat). No schema
+  change; reads `chat_messages` for the active `chat_id`.
+- **Privacy — conscious decision (recorded in `memory.md`):** an export takes
+  internal procedure content out of the app as an **uncontrolled file**.
+  Acceptable for this PoC, run by the owner on their own machine. **Must be
+  revisited before the tool is used by other people** (and before any
+  deployment — see OPEN-13).
