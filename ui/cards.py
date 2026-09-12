@@ -24,20 +24,37 @@ def kpi_row(items: list[tuple[str, str]]) -> None:
             )
 
 
-def source_chips(sources: list[dict]) -> None:
-    """Renders the small citation chips shown under an assistant chat message.
-    sources: list of {"display_name": ..., "section_title": ...(optional)}."""
+def source_chips(sources: list[dict], heading: str | None = None) -> None:
+    """
+    Renders the chips shown under an assistant chat message.
+
+    `sources` is the RETRIEVED chunk set (output of hybrid_search), not
+    necessarily what the model cited inline — so the caller passes a heading
+    ("Retrieved from") to avoid claiming these are the model's citations
+    (issue #2). Chips are deduped by (display_name, section_title) so two
+    chunks from the same document section render once (issue #3).
+    sources: list of {"display_name": ..., "section_title": ...(optional)}.
+    """
     if not sources:
         return
+    seen: set[tuple] = set()
     chips = []
     for s in sources:
-        name = html.escape(s.get("display_name", "Source"))
+        name = s.get("display_name", "Source")
         section = s.get("section_title")
-        label = f'<span class="wa-source-chip__name">{name}</span>'
+        key = (name, section)
+        if key in seen:
+            continue
+        seen.add(key)
+        safe_name = html.escape(name)
+        label = f'<span class="wa-source-chip__name">{safe_name}</span>'
         if section:
             label += f'<span class="wa-source-chip__section"> — {html.escape(section)}</span>'
         chips.append(f'<span class="wa-source-chip wa-source-chip--blue">\u25a4 {label}</span>')
-    st.html(f'<div class="wa-pill-row">{"".join(chips)}</div>')
+    heading_html = (
+        f'<div class="wa-chip-heading">{html.escape(heading)}</div>' if heading else ""
+    )
+    st.html(f'{heading_html}<div class="wa-pill-row">{"".join(chips)}</div>')
 
 
 def empty_state(text: str) -> None:

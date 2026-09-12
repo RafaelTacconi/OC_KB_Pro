@@ -127,6 +127,18 @@
 .wa-source-chip__name { font-weight: 600; }
 .wa-source-chip__section { opacity: 0.7; }
 
+/* Label above the retrieved-source chips ("Retrieved from"), so the row does
+   not claim to be the model's inline citations (issue #2). */
+.wa-chip-heading {
+  font-family: var(--wa-font);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-top: 0.5rem;
+}
+
 /* ---------------------------------------------------------------------------------------
    Task chips — the "/" predefined-task row in chat
 --------------------------------------------------------------------------------------- */

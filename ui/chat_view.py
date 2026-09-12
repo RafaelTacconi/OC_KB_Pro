@@ -579,15 +579,20 @@ def _render_chat_row(workspace_id: str, user_id: str) -> tuple[str | None, list[
 def _model_display_name(model_id: str) -> str:
     """
     SPEC §7.5 — the model that produced an assistant message, for display.
+    Shows the registry display_name AND the real .env slug, matching the model
+    picker ("Standard (openai/gpt-4o)"), so history names the actual model.
     Falls back to the raw model_id when the id is no longer in the registry
     (get_model_spec raises ValueError): since Step 2b a model can vanish from
     list_models() just by blanking a .env slug, while historical rows keep
     that id. Showing the raw id preserves provenance rather than hiding it.
+    Registry still owns the label, .env the slug (SPEC §14.3).
     """
     try:
-        return get_model_spec(model_id).display_name
+        spec = get_model_spec(model_id)
     except ValueError:
         return model_id
+    slug = provider_model_name(model_id)
+    return f"{spec.display_name} ({slug})" if slug else spec.display_name
 
 
 def render_chat_view(workspace_id: str, user_id: str) -> None:
@@ -665,7 +670,7 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
             if msg["role"] == "assistant" and msg.get("cited_sources"):
-                source_chips(json.loads(msg["cited_sources"]))
+                source_chips(json.loads(msg["cited_sources"]), heading="Retrieved from")
             # SPEC §7.5 — model attribution. Fall back to the raw model_id
             # when it's no longer in the registry (Step-6 item 1: blanking a
             # .env slug hides a model from the picker but historical rows
