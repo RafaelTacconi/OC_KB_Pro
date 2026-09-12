@@ -9,7 +9,7 @@ by AppTest in test_provider_config_app.py where they need a running app.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -26,6 +26,12 @@ from models.router import call_model
 def _env(monkeypatch: pytest.MonkeyPatch, **values: str) -> None:
     for k, v in values.items():
         monkeypatch.setenv(k, v)
+
+
+def _utc_today() -> date:
+    """api_key_status() compares against TODAY IN UTC; the tests must use the
+    same clock, or they fail by one day when the local date is ahead of UTC."""
+    return datetime.now(timezone.utc).date()
 
 
 def _endpoint_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -103,7 +109,7 @@ def test_call_model_raises_for_unknown_model(monkeypatch):
 
 
 def test_status_ok_when_far_future(monkeypatch):
-    future = (date.today() + timedelta(days=30)).isoformat()
+    future = (_utc_today() + timedelta(days=30)).isoformat()
     _env(monkeypatch, OPENAI_API_KEY_EXPIRES_ON=future)
     s = api_key_status()
     assert s.state == "ok"
@@ -111,7 +117,7 @@ def test_status_ok_when_far_future(monkeypatch):
 
 
 def test_status_expiring_within_warning_window(monkeypatch):
-    key = date.today() + timedelta(days=10)
+    key = _utc_today() + timedelta(days=10)
     _env(monkeypatch, OPENAI_API_KEY_EXPIRES_ON=key.isoformat())
     s = api_key_status()
     assert s.state == "expiring"
@@ -119,14 +125,14 @@ def test_status_expiring_within_warning_window(monkeypatch):
 
 
 def test_status_expiring_at_zero_is_still_usable(monkeypatch):
-    _env(monkeypatch, OPENAI_API_KEY_EXPIRES_ON=date.today().isoformat())
+    _env(monkeypatch, OPENAI_API_KEY_EXPIRES_ON=_utc_today().isoformat())
     s = api_key_status()
     assert s.state == "expiring"
     assert s.days_remaining == 0
 
 
 def test_status_expired_when_past(monkeypatch):
-    past = (date.today() - timedelta(days=1)).isoformat()
+    past = (_utc_today() - timedelta(days=1)).isoformat()
     _env(monkeypatch, OPENAI_API_KEY_EXPIRES_ON=past)
     s = api_key_status()
     assert s.state == "expired"
@@ -138,14 +144,14 @@ def test_status_boundary_exactly_warning_days(monkeypatch):
     _env(
         monkeypatch,
         OPENAI_API_KEY_EXPIRES_ON=(
-            date.today() + timedelta(days=KEY_EXPIRY_WARNING_DAYS)
+            _utc_today() + timedelta(days=KEY_EXPIRY_WARNING_DAYS)
         ).isoformat(),
     )
     assert api_key_status().state == "expiring"
     _env(
         monkeypatch,
         OPENAI_API_KEY_EXPIRES_ON=(
-            date.today() + timedelta(days=KEY_EXPIRY_WARNING_DAYS + 1)
+            _utc_today() + timedelta(days=KEY_EXPIRY_WARNING_DAYS + 1)
         ).isoformat(),
     )
     assert api_key_status().state == "ok"

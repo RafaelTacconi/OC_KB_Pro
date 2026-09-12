@@ -15,7 +15,39 @@ these functions directly.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+
+# A numbered section heading, e.g. "1. Scope", "2.1 Escalation", "3) Review".
+_NUMBERED_HEADING_RE = re.compile(r"^\s*\d+(?:\.\d+)*[.)]?\s+\S")
+# Upper bound on a plausible heading; longer strings are treated as body text.
+_MAX_HEADING_LEN = 120
+
+
+def _looks_like_heading(el_type: str, text: str) -> bool:
+    """
+    Decide whether an `unstructured` element is a SECTION HEADING.
+
+    `unstructured` over-labels body text as `Title` on some PDFs (wrapped
+    sentence fragments, e.g. "channel for Severity 1."), while the REAL
+    numbered headings often arrive as `ListItem` ("1. Scope"). So classify by
+    shape, not element type (issue #1):
+
+      - a numbered-heading pattern ("1.", "2.1", "3)") is a heading whatever
+        its element type;
+      - a `Title`/`Header` is a heading ONLY if it looks like one: short,
+        does not end with a sentence period, and starts with an uppercase
+        letter or digit.
+    """
+    if _NUMBERED_HEADING_RE.match(text):
+        return True
+    if el_type in ("Title", "Header"):
+        if len(text) > _MAX_HEADING_LEN:
+            return False
+        if text.endswith("."):
+            return False
+        return text[:1].isupper() or text[:1].isdigit()
+    return False
 
 
 @dataclass
@@ -195,9 +227,12 @@ def parse_xlsx(file_path: str) -> list[ParsedSection]:
 
 def _group_unstructured_elements(elements) -> list[ParsedSection]:
     """
-    Groups a flat list of `unstructured` elements into sections keyed by
-    the most recent Title/Header element seen. Elements before the first
-    title are grouped under section_title=None.
+    Groups a flat list of `unstructured` elements into sections keyed by the
+    most recent heading. Heading detection is by SHAPE (`_looks_like_heading`),
+    not by element type alone — see issue #1: PDF `partition_pdf` labels body
+    sentence fragments as `Title` while the real numbered headings arrive as
+    `ListItem`. Elements before the first heading are grouped under
+    section_title=None.
     """
     sections: list[ParsedSection] = []
     current_title: str | None = None
@@ -214,7 +249,7 @@ def _group_unstructured_elements(elements) -> list[ParsedSection]:
         el_text = str(el).strip()
         if not el_text:
             continue
-        if el_type in ("Title", "Header"):
+        if _looks_like_heading(el_type, el_text):
             flush()
             current_title = el_text
             current_texts = []
