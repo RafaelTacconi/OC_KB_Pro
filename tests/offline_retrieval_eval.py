@@ -9,7 +9,9 @@ Usage:
     1. Fill in QUESTION_SET below with real questions and the source file
        each should be answered from (ground truth), after uploading your
        actual test documents through the owner UI.
-    2. Run: python -m tests.offline_retrieval_eval
+    2. Run, passing the workspace_id to evaluate (SPEC §9.3):
+           python -m tests.offline_retrieval_eval <workspace_id>
+       e.g. python -m tests.offline_retrieval_eval aml-workspace
     3. Read the printed table. If hybrid underperforms lexical-only on more
        than a couple of questions, revisit the embedding strategy
        (Section 8.2a) before running the user-facing comparison (Section 11).
@@ -100,6 +102,13 @@ def run_eval(workspace_id: str) -> None:
 
 
 if __name__ == "__main__":
-    from config import DEFAULT_WORKSPACE_ID
+    import sys
 
-    run_eval(DEFAULT_WORKSPACE_ID)
+    if len(sys.argv) != 2:
+        print(
+            "Usage: python -m tests.offline_retrieval_eval <workspace_id>\n"
+            "e.g.   python -m tests.offline_retrieval_eval aml-workspace"
+        )
+        sys.exit(2)
+
+    run_eval(sys.argv[1])
