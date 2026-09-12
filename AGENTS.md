@@ -48,6 +48,11 @@ streamlit run app.py                                      # chat will fail until
 6. **Maintain the journal as you work** — `memory.md`, `state.md`, `changelog.md`, per
    `SPEC.md` §13. Log an `[OPEN]` item the moment you hit it, not at the end. Before stopping
    for any reason, `state.md` must stand on its own.
+7. **NEVER delete the repo `data/` directory.** It holds live runtime state — the SQLite DB
+   **and** `data/{workspace_id}/sources/` (the actual uploaded files) — and it is gitignored,
+   so deletion is unrecoverable. It has destroyed the owner's corpus three times. The test
+   suite tolerates a pre-existing `data/`; a clean DB is achieved with a temp cwd, never by
+   deleting `data/`. See `memory.md` "Rejected approaches".
 
 ## Environment limits
 

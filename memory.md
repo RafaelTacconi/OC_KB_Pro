@@ -359,7 +359,18 @@ implementation. Do not "simplify" the float arithmetic.
 
 ## Rejected approaches
 
-*(none yet — record what was tried and why it was abandoned, so it is not re-litigated)*
+### 2026-09-11 — NEVER delete `data/` to "clean" before a test run
+**Rejected, hard rule.** Running `Remove-Item -Recurse -Force data` (or any
+deletion of the repo `data/` directory) before `pytest` destroyed the owner's
+uploaded corpus + conversations **three times** across this project; the third
+time was pure habit long after the cause was fixed. `data/` holds live runtime
+state (the SQLite DB **and** `data/{workspace_id}/sources/` — the actual uploaded
+bytes); it is gitignored, so deletion is unrecoverable. The snapshot-based
+conftest guard already tolerates a pre-existing `data/` from a stopped app, so
+deletion is **never** required for the suite to pass. If a clean DB is genuinely
+needed, use a **temp cwd** (`monkeypatch.chdir(tmp_path)` in tests, or run the
+script from a temp dir) — never touch the real `data/`. Any future agent: do not
+delete `data/`, and verify ownership of a `data/` directory before touching it.
 
 ---
 
