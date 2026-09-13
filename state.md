@@ -4,96 +4,75 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-11 — Steps 1–7 + §15 complete; Step 8 awaiting owner inputs.
+**Last updated:** 2026-09-13 — Steps 1–7 + §14/§15/§16 done, §17 stub added, OPEN-14 raised; Step 8 awaiting owner inputs.
 
 ---
 
 ## Where the project stands
 
-**Implemented and green (Steps 1–7 + SPEC §15).** The full test suite passes from a
-clean clone: `git clone` → fresh venv → `pip install -r requirements.txt` →
-`python -m pytest tests/ -q`  → **67 passed**. Acceptance matrix for A1–A25 is in
-`ACCEPTANCE_MATRIX.md`. §15 added A26–A28 (embedded-image visibility + no-model
-send block). What has never been exercised: a **live model call** and **real
-documents**. A `.env` is configured in this repo (OpenRouter-compatible endpoint
-with 2 model slugs), so the app boots with a working model picker, but no real
-document has been ingested and no live model answer has been produced.
+**Implemented and green (Steps 1–7 + SPEC §14/§15/§16).** The full suite passes
+from a clean clone: `python -m pytest tests/ -q` → **78 passed**. Acceptance
+matrix for **A1–A34** is in `ACCEPTANCE_MATRIX.md`. Recent additions: §15
+embedded-image visibility + no-model send block (A26–A28); the post-test fixes
+§7.10–§7.13 (A29–A32, incl. the shape-based heading fix); §16 message timestamps
++ Markdown chat export (A33–A34). §17 is a titles-only stub for post-PoC
+direction (F1–F11).
+
+What has **never** been exercised: a **live model call** and **real documents**
+in the current runtime. A `.env` is configured (OpenRouter-compatible endpoint,
+2 model slugs), so the app boots with a working model picker.
+
+**Runtime `data/` is EMPTY** (only an app-bootstrapped `workspace_app.db`; no
+sources, no conversations). The corpus must be **re-uploaded** — via a terminal
+with the venv active — before Step 8 or the adversarial suite can run.
 
 ## Blocked on
 
-**OPEN-11 is answered** (OpenAI-compatible proxy, `openai` SDK). **OPEN-12, 3, 4,
-5, 7** have interim behaviour applied (`memory.md` Decision log, Authority: Agent
-applied spec interim). **OPEN-2** is updated-not-closed (context windows still
-256k assumption). What blocks nothing else: Step 8 needs documents + endpoint.
+Step 8 needs: (1) the corpus re-uploaded per Workspace, (2) ground-truth
+questions in `tests/offline_retrieval_eval.py`, (3) a live model call.
+
+**OPEN-14** (new): is the port already network-restricted? Owner is confirming
+with IT; do not answer. **OPEN-13** is deferred to the deployment layer.
+**OPEN-11** answered (OpenAI-compatible proxy). **OPEN-12/3/4/5/7** interim
+applied. **OPEN-4 is closed** (per-Workspace membership built). **OPEN-2** is
+updated-not-closed (context windows still 256k assumption).
 
 ## Step 8 — what you need to supply, run, and interpret
 
-Two things must exist before anything here works: a configured `.env` and real
-documents. Nothing in this section is runnable without them.
+### 0. Model endpoint
+`.env` is already configured in this repo (base URL + key + 2 model slugs). On a
+fresh clone: `copy .env.example .env` and fill in `OPENAI_BASE_URL`,
+`OPENAI_API_KEY`, and the `OPENAI_MODEL_*` slugs. `streamlit run app.py` runs
+**from a terminal with `.venv` activated** — the embedder (`sentence-transformers`)
+must be present in the serving interpreter or uploads fail.
 
-### 0. Configure the model endpoint
-1. `git clone git@github.com:RafaelTacconi/OC_KB_Pro.git`
-2. `cd OC_KB_Pro && python -m venv .venv && .venv\Scripts\pip install -r requirements.txt`
-3. `copy .env.example .env` and fill in:
-   - `OPENAI_BASE_URL=` — the OpenAI-compatible proxy URL
-   - `OPENAI_API_KEY=` — the key
-   - `OPENAI_MODEL_FAST=` / `OPENAI_MODEL_STANDARD=` / `OPENAI_MODEL_REASONING=`
-     — the exact slugs the endpoint expects. **Leave a slug blank to hide that
-     model from the picker.** Blank a slug to confirm OPEN-2's context-window
-     numbers later.
-   - `OPENAI_API_KEY_EXPIRES_ON=` — `YYYY-MM-DD`, optional; a 14-day countdown
-     warning shows to Owners only, `expired` shows red to everyone.
-4. `streamlit run app.py` — sign in as **Alex (Owner)**.
+> **DEPLOYMENT WARNING (OPEN-13):** no authentication. Anyone who can reach the
+> Streamlit port can select "Alex (Owner)" and delete any Workspace. Per-Workspace
+> membership gates *visibility*, not *identity*. **Put a network/reverse-proxy
+> auth layer in front of the port before exposing it.** OPEN-14 asks whether
+> that restriction already exists — unverified.
 
-> **DEPLOYMENT WARNING (OPEN-13, decision 2026-09-11):** the app has NO
-> authentication and never will in this PoC. Anyone who can reach the
-> Streamlit port can select "Alex (Owner)" from the sign-in dropdown and
-> upload/edit/delete any Workspace and its knowledge sources. Per-Workspace
-> membership (Manage → Users) only gates *visibility*, not *identity* — it does
-> NOT protect against this. **Before exposing the port to anyone but you, put a
-> network/reverse-proxy auth layer in front of it.** Until then, treat the port
-> as admin access to the whole corpus.
+### 1. Re-upload real documents per Workspace
+Manage → Knowledge → upload pdf/docx/xlsx per Workspace → *Process uploaded
+files* → confirm **indexed**. (First upload downloads `all-MiniLM-L6-v2` once.)
 
-A send should now return a live answer. If it fails: the §7.1 inline error with
-the exception in the expander tells you why (auth, timeout, model slug …). If the
-error says "not recognized"/"deployment not found"-style, STOP — that indicates
-Azure, which is not supported (OPEN-11); the adapter is OpenAI-compatible only.
-
-### 1. Upload real documents per Workspace
-Manage → Knowledge → upload your pdf/docx/xlsx per Workspace and hit
-*Process uploaded files*. Confirm each shows **indexed**. (The first upload
-downloads `all-MiniLM-L6-v2` — needs outbound network to huggingface.co at least
-once.)
-
-### 2. Ground-truth question sets (Step 8 task — the code change is NOT yet made)
-`tests/offline_retrieval_eval.py` currently **hardcodes `DEFAULT_WORKSPACE_ID`**
-and has an empty `QUESTION_SET`. §9.3 required turning the constant into a CLI
-argument. **This change is part of Step 8 and has not been made.** If you want
-the per-Workspace comparison, apply it first:
-
-- edit `if __name__ == "__main__":` in `tests/offline_retrieval_eval.py` to read
-  `sys.argv[1]` as the workspace_id instead of importing the constant.
-- fill `QUESTION_SET` with 10–15 questions per topic, each with
-  `expected_source_substring` = a distinctive part of the source file's
-  display_name.
+### 2. Ground-truth questions (the CLI-arg change is DONE)
+`tests/offline_retrieval_eval.py` now takes the workspace_id as a CLI argument
+(§9.3). Only `QUESTION_SET` is empty — fill it with 10–15 questions per topic,
+each with `expected_source_substring`, then run:
+`python -m tests.offline_retrieval_eval <workspace_id>`.
 
 ### 3. Run the §3.2 focus-hypothesis protocol
-1. One **mixed** Workspace containing all documents from all topics.
-2. Three **focused** Workspaces, each containing only its topic's documents.
-3. Run the harness against each: `python -m tests.offline_retrieval_eval <ws_id>`.
-4. Compare top-5 hit rates per question set.
-
-**What the results mean** (SPEC §9.3):
+Mixed Workspace vs three focused Workspaces; compare top-5 hit rates.
 
 | Result | Conclusion |
 |---|---|
-| Focused runs clearly beat mixed | Segregation helps retrieval; keep it. |
-| Focused ≈ mixed | The benefit of segregation is the Instructions/Tasks effect (§3.2a), not retrieval; still a real reason to segregate. |
-| Focused < mixed | Unexpected; capture the output and reconsider. |
+| Focused beats mixed | Segregation helps retrieval. |
+| Focused ≈ mixed | Benefit is the Instructions/Tasks effect (§3.2a), not retrieval. |
+| Focused < mixed | Unexpected; capture and reconsider. |
 
-Also while you have a live endpoint: confirm each model's real
-`context_window_tokens` (OPEN-2) and correct `models/registry.py` if 256k is
-wrong — `fits_in_context()` uses it.
+While you have a live endpoint: confirm each model's real `context_window_tokens`
+(OPEN-2) and correct `models/registry.py` if 256k is wrong.
 
 ## Progress
 
@@ -107,26 +86,23 @@ wrong — `fits_in_context()` uses it.
 | 6 — Visibility (grounding status, model attribution) | Done |
 | 7 — Cleanup (7.6, 7.7, 7.8) | Done |
 | §15 — Image visibility + no-model send block | Done |
-| 8 — Evaluate (§9.3) | **Not started — needs your documents + live model call** |
+| §16 — Message timestamps + Markdown chat export | Done |
+| §17 — Post-PoC direction (titles-only stub) | Documented, not built (by direction) |
+| 8 — Evaluate (§9.3) | **Not started — needs corpus re-upload + live model call** |
 
 ## Test status
 
 ```
 python -m pytest tests/ -q
-67 passed in 47.04s   (2026-09-11)
+78 passed   (2026-09-13)
 ```
-Verified from a **clean clone** earlier (fresh venv, fresh install): 55 passed at
-`a9d033c`; the later A3/§15/UI/membership additions brought it to 67. The conftest
-`data/` guard is now snapshot-based: a pre-existing `data/` from a stopped app is
-tolerated; the suite fails only if the TESTS create/modify/delete repo `data/`.
-The suite must still run with the app STOPPED (a live app writes to `data/`).
+The conftest `data/` guard is snapshot-based: a pre-existing `data/` from a
+stopped app is tolerated; the suite fails only if the TESTS create/modify/delete
+repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-For the owner: complete the Step 8 inputs (documents per Workspace, ground-truth
-question sets, the `offline_retrieval_eval.py` CLI-arg change), then run the §3.2
-protocol. `.env` is configured (2 model slugs), so the chat loop can be exercised
-now. Before test users: use the §15.1 Manage → Knowledge image note to size how
-much of the image-heavy corpus is image-only and unindexed (the earlier
-`scripts/image_audit.py` idea was superseded by the in-app warning). There is no
-implementation work left that an agent can do without you.
+For the owner: re-upload the corpus (terminal with venv active), fill
+`QUESTION_SET` in `tests/offline_retrieval_eval.py`, then run
+`python -m tests.offline_retrieval_eval <workspace_id>` and the §3.2 protocol.
+There is no implementation work left that an agent can do without you.

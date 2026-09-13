@@ -577,6 +577,7 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A3. Instructions and Tasks configured in Workspace A do not appear or apply in Workspace B.
 - A4. Switching Workspace clears any selected Task and any active Chat selection.
 - A5. A Member sees only Workspaces they are a member of, and never reaches the Manage surface by any route.
+  - **Amendment (2026-09-13) — part superseded by §17 F10.** The second half ("never reaches the Manage surface") is superseded when §17 F10 is built: under F10, Members reach Manage for Instructions, documents and Tasks; only membership management and Workspace deletion remain Owner/Admin. The first half (a Member sees only their own Workspaces) survives F10 and must be split into a criterion of its own at that point. **A5 and its test describe CURRENT behaviour, which is NOT changing in this amendment; the test must keep passing and must not be edited.**
 - A6. Sidebar branding shows the currently selected Workspace's name; no Workspace name is hardcoded anywhere in `app.py`.
 
 **Multi-Chat**
@@ -649,6 +650,7 @@ Consolidated. Each must be answered by the project owner; none should be resolve
 | **OPEN-11** | Is the endpoint an OpenAI-compatible proxy, Azure OpenAI, or `api.openai.com` directly? (§14.4) | Implement the OpenAI-compatible case. Stop and ask if a real call fails in a way that suggests Azure. | Azure needs a different client class, an `api-version`, and deployment names rather than model slugs. |
 | **OPEN-12** | Who sees the pre-expiry warning? (§14.5) | `expiring`/`unknown` to Owners; `expired` to everyone. | Members cannot renew a key, but they are the ones whose chat breaks when it lapses. |
 | **OPEN-13** | The internally deployed app has no authentication — anyone reaching the port can sign in as Owner and manage or delete any Workspace. Is the host network-restricted, or does the PoC need a gate before deployment? (§14.1) | None. Flagged only. Do not build authentication. | Constraint C6 was written for laptop testing with three users, not for a deployed internal host. |
+| **OPEN-14** | Is the Streamlit port network-restricted to entitled users, or merely reachable on the internal network by anyone who knows the address? | Unverified; treat "anyone who can open the app is already authorised" as an assumption, not a fact. | §17 F10's identity model rests entirely on this premise. If the port is merely reachable, self-declared identity is not an access control at all. Related to OPEN-13 but not the same question — OPEN-13 asks whether a gate is needed, OPEN-14 asks whether one already exists. |
 
 ---
 
@@ -656,7 +658,7 @@ Consolidated. Each must be answered by the project owner; none should be resolve
 
 Do not build these. They are not in the draft or the brief, and adding them would exceed the PoC's stated boundaries.
 
-- Authentication, SSO, user invitation, user removal, password handling (constraint C6).
+- Authentication, SSO, user invitation, user removal, password handling (constraint C6). **PoC-scope only:** out of scope for this PoC under constraint C6, and superseded post-PoC by §17 F10, which replaces the hardcoded test users with a per-Workspace identity and permission model.
 - Live `/` autocomplete in the chat input (constraint C7).
 - Confluence ingestion or any `source_type` beyond `pdf`/`docx`/`xlsx`.
 - A vector database, ANN index, or FAISS. Brute-force cosine is the specified approach at this scale.
@@ -986,3 +988,27 @@ from"), the model (display name + `.env` slug), and the timestamp.
   Acceptable for this PoC, run by the owner on their own machine. **Must be
   revisited before the tool is used by other people** (and before any
   deployment — see OPEN-13).
+
+---
+
+## 17. Post-PoC direction (titles only)
+
+The detail for the items below lives in the project owner's vision document,
+which is deliberately **not** in this repository. This section exists only so
+that earlier sections can reference these items by identifier. It carries no
+implementation detail and no acceptance criteria.
+
+- **F1** Default Instructions fallback
+- **F2** Retrieval performance fix (fetch only what scoring needs)
+- **F3** "This Workspace is getting large" indicator
+- **F4** Processing and activity logging
+- **F5** Chat export and visible timestamps — **NOTE: built, see §16.2**
+- **F6** Specialised Agents within a Workspace
+- **F7** Service interface (API / MCP)
+- **F8** Reading embedded images (deferred by direction)
+- **F9** One database per Owner (evaluate, do not assume)
+- **F10** Identity, roles and permissions
+- **F11** In-app user guide
+
+None of the remaining items is in PoC scope, and none is built before it is
+written into this spec with acceptance criteria.

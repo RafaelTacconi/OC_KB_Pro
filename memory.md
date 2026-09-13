@@ -162,6 +162,17 @@ Consequence: The impersonation risk is real and open until the deploy-time gate 
 Per-Workspace membership (OPEN-4 build) does NOT close it — it only gates visibility, not
 identity.
 
+### OPEN-14 — Is the port already network-restricted? — 2026-09-13
+Question: Is the Streamlit port network-restricted to entitled users, or merely reachable on
+the internal network by anyone who knows the address?
+Outcome: Unverified. Interim: treat "anyone who can open the app is already authorised" as an
+assumption, not a fact.
+Authority: Deferred — not reached.
+Consequence: §17 F10's identity model rests entirely on this premise. If the port is merely
+reachable, self-declared identity is not an access control at all. Related to OPEN-13 but not
+the same question — OPEN-13 asks whether a gate is needed, OPEN-14 asks whether one already
+exists.
+
 ---
 
 ## Codebase discoveries
@@ -410,6 +421,28 @@ deletion is **never** required for the suite to pass. If a clean DB is genuinely
 needed, use a **temp cwd** (`monkeypatch.chdir(tmp_path)` in tests, or run the
 script from a temp dir) — never touch the real `data/`. Any future agent: do not
 delete `data/`, and verify ownership of a `data/` directory before touching it.
+
+### 2026-09-13 — Image reading was rejected for the WRONG reason — supersedes the OCR entry
+**Supersedes:** "OCR is scoped-and-deferred (out of scope for the PoC) — SPEC
+§15.1" (Codebase discoveries, 2026-09-11). That entry rejected reading embedded
+images, but its reasoning was **OCR-specific**: Tesseract and poppler native
+binaries on Windows, minutes per file, file-level-only citations, and a vision
+model additionally needed for DOCX. **That reasoning is void for the actual
+proposal**, which needs none of it.
+
+The real proposal is to send each **extracted image to a vision-capable model
+through the SAME OpenAI-compatible endpoint already configured** (SPEC §14), and
+store the returned description as text inserted at the point the image sat. No
+new software, no native dependencies, no separate toolchain.
+
+**F8** is therefore deferred **by DIRECTION, not by cost.** If the tool's value
+is other systems calling it for specific answers (§17 F7), image content rarely
+matters, because those answers live in text. If that direction changes, this
+decision reopens.
+
+The image-count warning in Manage → Knowledge (SPEC §15.1) remains the only
+signal of the gap, and only the Owner sees it.
+Authority: Answered by project owner on 2026-09-13.
 
 ---
 

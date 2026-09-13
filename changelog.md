@@ -7,6 +7,37 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-13 — Documentation pass (spec amendments; no code)
+
+Owner-directed documentation-only amendments. **No application code and no test
+file was touched.**
+
+- **SPEC §17 (new)** — "Post-PoC direction (titles only)": a stub listing F1–F11
+  so earlier sections can reference them by id. Detail lives in the owner's
+  vision document, deliberately not in this repo.
+- **SPEC §10 A5** — added an amendment note: the "never reaches Manage" half is
+  superseded when §17 F10 is built; the "sees only their Workspaces" half
+  survives. A5 and its test describe CURRENT behaviour and are unchanged.
+- **SPEC §12** — the authentication bullet restated as PoC-scope-only and
+  superseded post-PoC by §17 F10.
+- **SPEC §11** — added **OPEN-14** (is the port already network-restricted?).
+- **ACCEPTANCE_MATRIX.md** — A5 row gains a "Superseded by" note; its ✅ status
+  is unchanged (still true and proven today).
+- **memory.md** — OPEN-14 decision-log entry (Authority: Deferred — not
+  reached); a superseding "Rejected approaches" entry for image reading (the
+  earlier OCR-based rejection was for the wrong reason — a vision-model path via
+  the existing endpoint has no new dependencies; F8 is deferred by direction,
+  not cost).
+
+**Schema and migration changes**
+- None.
+
+**Files modified**
+- `SPEC.md`, `ACCEPTANCE_MATRIX.md`, `memory.md`, `changelog.md`, `state.md`.
+- **No code or test file was touched.**
+
+---
+
 ## 2026-09-13 — SPEC write-up for the fixes + item 6 built (timestamps, export)
 
 **Spec-before-build correction.** The four behaviour changes shipped earlier

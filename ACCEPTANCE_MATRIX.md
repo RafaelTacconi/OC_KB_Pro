@@ -14,7 +14,7 @@ prove it, or is marked *not verifiable* with the reason. The full suite
 | A2 | Uploading to Workspace A never retrieved in B | `tests/test_workspace_isolation.py` — retrieval layer, lexical + semantic + hybrid each asserted to return nothing across the boundary (embedder stubbed; verifies the `workspace_id` filter, not ranking) | ✅ |
 | A3 | Instructions/Tasks in A don't appear/apply in B | `tests/test_multi_workspace.py::test_a3_instructions_and_tasks_do_not_leak` (AppTest: create Workspace B, give it its own Instructions + Task, verify Workspace A's chat still shows A's Instructions applied and only A's Tasks; and vice-versa) | ✅ |
 | A4 | Switching Workspace clears Task + active Chat | `tests/test_multi_workspace.py::test_a4_switch_clears_task_and_active_chat` | ✅ |
-| A5 | Member sees only their Workspaces; never reaches Manage | `tests/test_multi_workspace.py::test_a5_member_sees_only_their_workspaces_and_no_manage` | ✅ |
+| A5 | Member sees only their Workspaces; never reaches Manage | `tests/test_multi_workspace.py::test_a5_member_sees_only_their_workspaces_and_no_manage` | ✅ **Superseded by:** the "never reaches Manage" half is superseded post-PoC by SPEC.md §10's A5 amendment and §17 F10; the "sees only their Workspaces" half survives. Still true and proven today. |
 | A6 | Sidebar branding shows current Workspace name; nothing hardcoded | `tests/test_multi_workspace.py::test_a6_branding_uses_workspace_name` + code inspection (page_title = `APP_TITLE`) | ✅ |
 
 ## Multi-Chat (SPEC §6)
