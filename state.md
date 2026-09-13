@@ -4,18 +4,20 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-13 — Steps 1–7 + §14/§15/§16 done; **Step 8 focused-vs-mixed evaluation RUN** (results recorded); decision pending.
+**Last updated:** 2026-09-13 — Steps 1–7 + §14/§15/§16 done; **Step 8 focused-vs-mixed evaluation RUN** (results recorded); **new-chat selection fix (§7.14/A36) + grounding rules (§18/A37–A41) DONE**; decision pending.
 
 ---
 
 ## Where the project stands
 
-**Implemented and green (Steps 1–7 + SPEC §14/§15/§16).** The full suite passes
-from a clean clone: `python -m pytest tests/ -q` → **78 passed**. Acceptance
-matrix for **A1–A34** is in `ACCEPTANCE_MATRIX.md`. Recent additions: §15
-embedded-image visibility + no-model send block (A26–A28); the post-test fixes
-§7.10–§7.13 (A29–A32, incl. the shape-based heading fix); §16 message timestamps
-+ Markdown chat export (A33–A34); §9.3 second CLI argument (A35). §17 is a
+**Implemented and green (Steps 1–7 + SPEC §14/§15/§16 + §7.14/§18).** The full
+suite passes from a clean clone: `python -m pytest tests/ -q` → **79 passed**.
+Acceptance matrix for **A1–A41** is in `ACCEPTANCE_MATRIX.md`. Recent additions:
+§15 embedded-image visibility + no-model send block (A26–A28); the post-test
+fixes §7.10–§7.14 (A29–A32, A36, incl. shape-based headings and the new-chat
+selection fix); §16 message timestamps + Markdown chat export (A33–A34); §9.3
+second CLI argument (A35); §18 grounding rules in `SYSTEM_POLICY` (A37–A41,
+prompt-level only, hand-verified via `GROUNDING_REGRESSION.md`). §17 is a
 titles-only stub for post-PoC direction (F1–F11).
 
 **Step 8 focused-vs-mixed evaluation RAN (2026-09-13),** on the re-uploaded
@@ -95,6 +97,8 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 | 7 — Cleanup (7.6, 7.7, 7.8) | Done |
 | §15 — Image visibility + no-model send block | Done |
 | §16 — Message timestamps + Markdown chat export | Done |
+| §7.14 — New-chat selection after first question (A36) | Done |
+| §18 — Grounding rules in the system prompt (A37–A41) | Done (prompt-level only; hand-verified) |
 | §17 — Post-PoC direction (titles-only stub) | Documented, not built (by direction) |
 | 8 — Evaluate (§9.3) | **RUN (2026-09-13) — results recorded; owner decision pending** |
 
@@ -102,7 +106,7 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 
 ```
 python -m pytest tests/ -q
-78 passed   (2026-09-13)
+79 passed   (2026-09-13)
 ```
 The conftest `data/` guard is snapshot-based: a pre-existing `data/` from a
 stopped app is tolerated; the suite fails only if the TESTS create/modify/delete
@@ -113,7 +117,8 @@ repo `data/`. Run the suite with the app **stopped**.
 For the owner: **decide what (if anything) the flat §3.2 result changes** — the
 numbers do not motivate changing `top_k`/`MAX_RETRIEVED_TOKENS`/`rrf_k`/
 `candidate_pool`/chunk size, and no such change has been made. Remaining
-independent tasks: run the hand-checked negative control in chat; the adversarial
-suite (`adversarial_tests.md`, owner-run); confirm context windows against the
+independent tasks: run the hand-checked negative control in chat; re-run the
+seven-case grounding regression set (`GROUNDING_REGRESSION.md`, owner-run, needs a
+live endpoint) to confirm A37–A41 now hold; confirm context windows against the
 live endpoint (OPEN-2). There is no implementation work left that an agent can do
 without you.

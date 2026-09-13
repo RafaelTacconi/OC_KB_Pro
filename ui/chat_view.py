@@ -334,11 +334,19 @@ def _answer(
     """
     _clear_pending_error()
     st.session_state.pop("wa_semantic_degraded", None)
+    was_new_chat = chat_id is None
     chat_id = _save_message(
         workspace_id, user_id, chat_id, "user", user_input,
         task_id=task["task_id"] if task else None,
     )
     st.session_state["wa_chat_id"] = chat_id
+    if was_new_chat:
+        # SPEC §7.14 / A36: the chat selector is a keyed widget that retains its
+        # stored value across reruns. A brand-new chat rendered the selector
+        # with the NEW_CHAT sentinel; now the chat exists. Bump the generation so
+        # the selector re-initialises from index= (the new chat_id) instead of
+        # restoring NEW_CHAT on the next rerun and resetting to an empty chat.
+        st.session_state["wa_chat_gen"] = st.session_state.get("wa_chat_gen", 0) + 1
 
     with st.chat_message("user"):
         st.write(user_input)

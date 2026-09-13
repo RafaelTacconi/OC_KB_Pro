@@ -239,3 +239,52 @@ def test_new_chat_keeps_selector_and_history_reachable(
     assert MSG_A1 in [m["content"] for m in _messages_for(db_path, saved_id)]
     # Still only one chat row — switching back did not create another.
     assert len(_chat_counts(db_path)) == 1
+
+
+def test_a36_new_chat_keeps_selection_after_first_question(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stubbed_answer
+) -> None:
+    """SPEC §7.14 / A36: after the first question in a NEW chat, the chat stays
+    selected (wa_chat_id is the real id, the selector shows it), the title
+    updates to the question, and the Q&A remain on screen with no refresh.
+
+    Requires a pre-existing chat so the selector (with the NEW_CHAT sentinel) is
+    actually rendered before the new chat is sent — that widget's retained value
+    is the cause of the bug.
+    """
+    monkeypatch.chdir(tmp_path)
+    at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=30).run()
+    assert not at.exception
+    db_path = tmp_path / "data" / "workspace_app.db"
+
+    # A pre-existing chat, so the selector renders.
+    at.chat_input[0].set_value(MSG_A1).run()
+    assert not at.exception
+    assert len(_chat_counts(db_path)) == 1
+
+    # '+ New chat' -> the selector now offers the saved chat and 'New chat'.
+    at.button(key="new_chat_aml-workspace_u_owner").click().run()
+    assert not at.exception
+
+    # Send the new chat's FIRST question.
+    at.chat_input[0].set_value(MSG_A2).run()
+    assert not at.exception
+
+    # A36: the chat stays selected — wa_chat_id is the real id, not None...
+    assert at.session_state["wa_chat_id"] is not None
+    selected = at.session_state["wa_chat_id"]
+
+    # ...the selector shows that chat (chosen == current)...
+    sel = next(sb for sb in at.selectbox
+               if sb.key and sb.key.startswith("chat_selector_"))
+    assert sel.value == selected
+
+    # ...the title updated to the question...
+    chats = {c["chat_id"]: c["title"] for c in _chat_counts(db_path)}
+    assert len(chats) == 2
+    assert chats[selected] == MSG_A2
+
+    # ...and the question + answer remain on screen (no empty state).
+    rendered = " ".join((m.value or "") for m in at.markdown)
+    assert MSG_A2 in rendered
+    assert "No messages yet" not in rendered

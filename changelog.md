@@ -7,6 +7,59 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-13 — New-chat selection fix (§7.14) + grounding rules in the system prompt (§18)
+
+Two owner-directed jobs. **Spec written first for both** (`[NEW]` §7.14 / A36; §18 / A37–A41),
+then built.
+
+**Job 1 — a new Chat lost its selection after the first question (§7.14 / A36).**
+- The owner's diagnosis was verified against the code and **confirmed**. The chat selector is a
+  keyed widget (`chat_selector_{ws}_{user}_{gen}`). A brand-new chat (`wa_chat_id is None`)
+  renders it with the `NEW_CHAT` sentinel selected, so Streamlit stores `NEW_CHAT` against that
+  key. `_answer()` then created the chat row and set `wa_chat_id` to the real id but did **not**
+  bump the generation, so the next rerun restored the stored `NEW_CHAT` over `index=`; the
+  "chosen != current" branch reset `wa_chat_id` to `None`, bumped `wa_chat_gen`, and reran into an
+  empty new chat. Nothing was lost — a display bug only.
+- **Fix** (`ui/chat_view.py::_answer()`): capture `was_new_chat = chat_id is None` before the
+  persist, and bump `wa_chat_gen` when the turn creates the Chat, so the selector re-initialises
+  from `index=` (the new real `chat_id`) on the next render. Manual switching and "+ New chat" are
+  unaffected.
+- **Regression test:** `tests/test_multi_chat.py::test_a36_new_chat_keeps_selection_after_first_question`
+  (AppTest; seeds a pre-existing chat first so the sentinel selector actually renders, then sends
+  the new chat's first question and asserts the selection, the title, and the on-screen Q&A).
+
+**Job 2 — grounding failures found in the adversarial run (§18 / A37–A41).**
+- Seven owner-confirmed failures, all one shape: the model detects the gap, states it, then
+  answers past it. Root cause is **prompt-level, not retrieval** — the right chunks were retrieved
+  and the model saw the gap.
+- `prompting/assemble.py::SYSTEM_POLICY` rewritten with five absolute grounding rules: a stated gap
+  is **stopped at**; nothing calculated from a value the documents do not contain; silence never
+  read as a rule; agreement attributed only when **both** sources address the subject; a
+  multi-answer question answered in full, labelled, or clarified.
+- `retrieval/` untouched; **no** change to `top_k`, `MAX_RETRIEVED_TOKENS`, `rrf_k`,
+  `candidate_pool`, or chunk sizes.
+- Seven cases recorded as a **named hand-run regression set** in `GROUNDING_REGRESSION.md` (new).
+  No automated test calls the live model.
+
+**Schema and migration changes**
+- None.
+
+**Files added / modified**
+- Added: `GROUNDING_REGRESSION.md`.
+- Modified: `prompting/assemble.py`, `ui/chat_view.py`, `tests/test_multi_chat.py`, `SPEC.md`,
+  `ACCEPTANCE_MATRIX.md`, `memory.md`, `changelog.md`, `state.md`.
+
+**Acceptance criteria satisfied**
+- A36 (new-chat selection); A37–A41 (grounding rules — verified by the hand-run set, not
+  automated). No prior criterion regressed.
+- `python -m pytest tests/ -q` → **79 passed** (`.venv`; `pypdf` present).
+
+**Known-broken / deferred**
+- A37–A41 cannot be proven automatically (no test may call the live model); they stay
+  owner-verified by re-running `GROUNDING_REGRESSION.md` against a live endpoint.
+
+---
+
 ## 2026-09-13 — Step 8: focused-vs-mixed retrieval evaluation (§9.3)
 
 Corpus re-uploaded (four Workspaces). The harness gained a second CLI argument

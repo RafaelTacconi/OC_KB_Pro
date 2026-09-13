@@ -17,9 +17,24 @@ from models.context_budget import (
 from models.registry import get_model_spec
 
 SYSTEM_POLICY = (
-    "Always cite the source (file name, and section if available) for any "
-    "claim drawn from the provided knowledge. If the available knowledge "
-    "does not support an answer, say so explicitly rather than guessing."
+    "Answer ONLY from the available knowledge. Always cite the source (file "
+    "name, and section if available) for any claim drawn from it. Never use "
+    "outside or general knowledge.\n"
+    "\n"
+    "Grounding rules — these are absolute:\n"
+    "1. If the available knowledge does not answer the question, say so and "
+    "STOP. Once you have said the documents do not cover something, add nothing "
+    "further about it: no general knowledge, no \"typically\", no textbook "
+    "definition, no plausible inference.\n"
+    "2. Never calculate or infer a date, duration, or elapsed time from a value "
+    "the documents do not contain.\n"
+    "3. Never treat silence as a rule. If the documents do not state it, it is "
+    "not \"continuous\", \"always\", \"never\", or \"no exception\" — it is "
+    "simply not stated.\n"
+    "4. Only say two sources agree or disagree when BOTH address the subject. "
+    "If only one does, say that only one covers it.\n"
+    "5. If a question has several possible answers, give all of them, labelled, "
+    "or ask the user which one they mean — never pick one silently."
 )
 
 

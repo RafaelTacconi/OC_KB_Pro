@@ -499,6 +499,16 @@ These are real but the draft accepts them or is silent. **Do not fix without a d
 
 **Fix:** render the turn inline — the spinner sits INSIDE the assistant `st.chat_message` bubble and the answer is written into that same bubble, so the spinner transitions directly into the answer; the caller's rerun then re-renders the identical turn from the DB.
 
+### 7.14 `[FIX]` A new Chat loses its selection after the first question
+
+**Where:** `ui/chat_view.py::_render_chat_row()` + `_answer()`.
+
+**Current behaviour:** the chat selector is a keyed widget whose key carries a generation counter (`wa_chat_gen`). For a brand-new chat `wa_chat_id` is `None`, so the selector renders with the `NEW_CHAT` sentinel selected and Streamlit stores `NEW_CHAT` against that key. `_answer()` then creates the chat row and sets `wa_chat_id` to the real id — but does **not** bump the generation. On the next rerun the key is unchanged, so Streamlit restores the stored `NEW_CHAT` value, overriding `index=`. Thus `chosen == NEW_CHAT` while `current == the real chat_id`, the "chosen != current" branch fires, `wa_chat_id` is reset to `None`, the generation is bumped, and it reruns into an empty new chat. The conversation appears to vanish until a manual refresh (nothing is actually lost — it is a display bug).
+
+**Fix:** bump `wa_chat_gen` whenever a turn **creates** a Chat (i.e. `chat_id` was `None`), so the selector re-initialises from `index=` (the new real chat_id) on the next render. After the first question the chat stays selected, its title updates to the question, and the question + answer remain on screen with no refresh. Manual switching and "+ New chat" are unaffected.
+
+**Required behaviour (A36):** after the first question in a new Chat, the Chat remains selected, its title updates to the question, and the question and answer remain visible without a refresh; switching Chats by hand and "+ New chat" still work.
+
 ---
 
 ## 8. Architecture rules for the implementing agent
@@ -631,6 +641,15 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A33. Every message in the UI shows its timestamp; stored `created_at` remains UTC, and the displayed value is the user's local time. Display-only — no schema change.
 - A34. An Owner/user can export the active Chat as a Markdown file containing, per turn, the question, the answer, the retrieved sources, the model (display name + slug), and the timestamp.
 - A35. `tests/offline_retrieval_eval.py` takes a second CLI argument (`aml` / `hr` / `sec` / `all`) selecting which of `AML_QUESTIONS` / `HR_QUESTIONS` / `SEC_QUESTIONS` / the combined set runs, without editing the file between runs; the scoring logic, `TOP_K`, and everything in `retrieval/` are unchanged.
+- A36. After the first question in a new Chat, the Chat remains selected, its title updates to the question, and the question and answer remain visible without a refresh; switching Chats by hand and "+ New chat" still work.
+
+**Grounding rules in the system prompt** (§18) — verified by the hand-run adversarial set (§18.2), not by an automated test.
+
+- A37. A gap the documents reveal is stated and stopped at: nothing is added after "the documents do not say" — no general knowledge, no "typically", no textbook definition, no plausible inference.
+- A38. No date, duration, or elapsed time is calculated or inferred from a value the documents do not contain.
+- A39. Document silence is never presented as a rule — "not stated" is not "continuous", "always", "never", or "no exception".
+- A40. Two sources are described as agreeing or disagreeing only when BOTH address the subject; when only one does, the answer says so.
+- A41. A question with several possible answers gets all of them, labelled, or a request to clarify — never one picked silently.
 
 ---
 
@@ -1015,3 +1034,44 @@ implementation detail and no acceptance criteria.
 
 None of the remaining items is in PoC scope, and none is built before it is
 written into this spec with acceptance criteria.
+
+---
+
+## 18. Grounding rules in the system prompt (prompting/instructions)
+
+The prompt is built centrally in `prompting/assemble.py::build_prompt()` (SPEC
+§2 constraint 6, §8 rule 4); the system policy is the `SYSTEM_POLICY` constant
+there. Owner-directed rules, added 2026-09-13 after the adversarial run.
+
+### 18.1 The rules `[NEW]`
+
+The system prompt must instruct the model to:
+
+1. **State a gap and stop at it.** When the available knowledge does not answer
+   the question, say so and add nothing further about it — no general knowledge,
+   no "typically", no textbook definition, no plausible inference. A detected
+   gap is an answer.
+2. **Never calculate from absent data.** No date, duration, or elapsed time may
+   be derived from a value the documents do not contain.
+3. **Never read silence as a rule.** If the documents do not state something, it
+   is not "continuous", "always", "never", or "no exception" — it is simply not
+   stated.
+4. **Attribute agreement only when both sources speak.** Two sources may be
+   called agreeing or disagreeing only when BOTH address the subject; when only
+   one does, say so.
+5. **Answer multi-answer questions fully.** A question with several possible
+   answers gets all of them, labelled, or a request to clarify — never one
+   picked silently.
+
+Plus the existing requirement: answer only from the available knowledge, cite the
+source for every claim, and never use outside/general knowledge.
+
+### 18.2 Verification `[NEW]`
+
+These are **not** automatically tested (no test may call the live model). They are
+verified by the hand-run adversarial set — the seven confirmed failures of
+2026-09-13, recorded as a named regression set in `GROUNDING_REGRESSION.md` at the
+repository root. Acceptance criteria: A37–A41.
+The fix is **prompt-level only**: `retrieval/`, `top_k`,
+`MAX_RETRIEVED_TOKENS`, `rrf_k`, `candidate_pool`, and chunk sizes are NOT
+touched.

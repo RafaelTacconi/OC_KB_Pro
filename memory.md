@@ -405,6 +405,25 @@ tolerance might not catch the shift. Guarded by
 `test_chunk_boundaries_unchanged_after_dedupe`, which pins the layout against a reference
 implementation. Do not "simplify" the float arithmetic.
 
+### 2026-09-13 — The seven grounding failures are prompt-level, not retrieval — no parameter changed
+Owner hand-ran the adversarial suite on **2026-09-13** and confirmed **seven** failures, all the
+same shape: the model **detects the gap, says so, then answers past its own refusal in the same
+breath** — supplying general knowledge, a "typically", a textbook definition, or a value/date it
+was never given. Cases: (1) "What's the deadline?" answered 12h as if unique though the corpus has
+at least four; (2) derived "2026" for destroying 2019 files from a 3-year premise the question
+invented, when retention is 7 years from the END OF THE CUSTOMER RELATIONSHIP — never given;
+(3) declared the 12-hour clock "runs continuously" when overnight/weekend handling is genuinely
+unspecified; (4) defined a SAR after correctly saying the corpus never does; (5) described what
+training policies "typically" contain after noting training is not covered; (6) computed 04:00
+Saturday without flagging weekend handling as unspecified; (7) claimed policy and severity matrix
+"agree" on Severity 3 when only the matrix mentions it. **Common root cause is not search** — the
+right chunks were retrieved and the model SAW the gap; the system prompt allowed the answer to
+continue after a stated gap. **The fix is prompt-level ONLY**: `prompting/assemble.py::SYSTEM_POLICY`
+gained five absolute grounding rules (SPEC §18.1, A37–A41). `retrieval/` and every retrieval
+constant (`top_k`, `MAX_RETRIEVED_TOKENS`, `rrf_k`, `candidate_pool`, chunk sizes) were **not**
+touched. The seven are kept as a named hand-run regression set in `GROUNDING_REGRESSION.md`; no
+automated test may call the live model.
+
 ---
 
 ## Rejected approaches

@@ -1,10 +1,10 @@
-# Acceptance matrix — A1–A34
+# Acceptance matrix — A1–A41
 
 Verified 2026-09-13 against current `main` (Steps 1–7 complete, §14/§15/§16
-work; Step 8 not started). Method: each criterion is mapped to the test(s) that
-prove it, or is marked *not verifiable* with the reason. The full suite
-(**78 passed**) runs from a clean clone: `git clone` → fresh venv →
-`pip install -r requirements.txt` → `python -m pytest tests/ -q`.
+work; Step 8 run; §7.14/A36 and §18/A37–A41 added). Method: each criterion is
+mapped to the test(s) that prove it, or is marked *not verifiable* with the
+reason. The full suite (**79 passed**) runs from a clean clone: `git clone` →
+fresh venv → `pip install -r requirements.txt` → `python -m pytest tests/ -q`.
 
 ## Multi-Workspace (SPEC §5)
 
@@ -75,13 +75,43 @@ against the real corpus before citations are trusted.
 | A33 | Every message shows a timestamp; stored UTC, displayed local; no schema change | `tests/test_citations_timestamps_export.py::test_a33_format_local_time_converts_from_utc`, `test_a33_and_a34_seeded_chat_shows_timestamp_and_export` | ✅ |
 | A34 | Markdown export of the active Chat: question, answer, sources, model, timestamp | `tests/test_citations_timestamps_export.py::test_a34_chat_to_markdown_contains_all_fields`, `test_a33_and_a34_seeded_chat_shows_timestamp_and_export` | ✅ |
 
+## Evaluation (SPEC §9.3)
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A35 | Offline harness takes a second CLI arg (`aml`/`hr`/`sec`/`all`) selecting the question set; scoring, `TOP_K`, `retrieval/` unchanged | `tests/offline_retrieval_eval.py` (arg parsing + `AML_QUESTIONS`/`HR_QUESTIONS`/`SEC_QUESTIONS`); run recorded in `changelog.md` (focused 15/15 vs mixed 14/15) | ✅ |
+
+## New-chat selection (SPEC §7.14)
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A36 | After the first question in a new Chat: chat stays selected, title updates, Q&A stay on screen without refresh; manual switching and "+ New chat" still work | `tests/test_multi_chat.py::test_a36_new_chat_keeps_selection_after_first_question` (AppTest; seeds a prior chat so the sentinel selector renders, then sends the new chat's first question) | ✅ |
+
+## Grounding rules in the system prompt (SPEC §18) — hand-run only
+
+These are **not** automatically tested (no automated test may call the live
+model). They are verified by the owner re-running the seven-case regression set
+in `GROUNDING_REGRESSION.md`.
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A37 | A stated gap is stopped at — nothing is added after "the documents do not say" (no general knowledge, no "typically", no textbook definition, no plausible inference) | `GROUNDING_REGRESSION.md` G4, G5 (hand-run) + code inspection of `prompting/assemble.py::SYSTEM_POLICY` rule 1 | ✅ *hand-run only* |
+| A38 | No date, duration, or elapsed time calculated/inferred from a value the documents do not contain | `GROUNDING_REGRESSION.md` G2, G6 (hand-run) + `SYSTEM_POLICY` rule 2 | ✅ *hand-run only* |
+| A39 | Document silence never presented as a rule — "not stated" is not "continuous"/"always"/"never"/"no exception" | `GROUNDING_REGRESSION.md` G3, G6 (hand-run) + `SYSTEM_POLICY` rule 3 | ✅ *hand-run only* |
+| A40 | Two sources called agreeing/disagreeing only when BOTH address the subject; when only one does, say so | `GROUNDING_REGRESSION.md` G7 (hand-run) + `SYSTEM_POLICY` rule 4 | ✅ *hand-run only* |
+| A41 | A multi-answer question gets all answers, labelled, or a request to clarify — never one picked silently | `GROUNDING_REGRESSION.md` G1 (hand-run) + `SYSTEM_POLICY` rule 5 | ✅ *hand-run only* |
+
 ## Not verifiable without owner inputs
 
-- **Live answer quality** — no real endpoint, no real documents. The chat loop
-  is real up to the model call (proven), but a grounded answer has never been
-  produced.
-- **Step 8 / §3.2 hypothesis** — whether focused Workspaces beat a mixed one
-  cannot be measured at all until corpora exist.
+- **Live answer quality** — no live endpoint in this runtime. The owner's
+  hand-run 2026-09-13 evaluation reached a live model on their machine (15/15,
+  recorded in `changelog.md`), and the hand-run adversarial suite surfaced the
+  seven grounding failures now covered by A37–A41; those need a re-run to confirm
+  the prompt fix.
+- **Step 8 / §3.2 hypothesis** — RUN 2026-09-13 on the re-uploaded corpus:
+  focused 15/15 vs mixed 14/15 (essentially flat). Recorded in `changelog.md` and
+  `state.md`; the owner decides what (if anything) it changes. No retrieval
+  parameter was changed.
 - **OPEN-2's open half** — the real `context_window_tokens` per model must be
   confirmed against the live endpoint; 256k is still the assumption.
 
