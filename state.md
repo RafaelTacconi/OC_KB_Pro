@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-13 — Steps 1–7 + §14/§15/§16 done, §17 stub added, OPEN-14 raised; Step 8 awaiting owner inputs.
+**Last updated:** 2026-09-13 — Steps 1–7 + §14/§15/§16 done; **Step 8 focused-vs-mixed evaluation RUN** (results recorded); decision pending.
 
 ---
 
@@ -15,27 +15,39 @@ from a clean clone: `python -m pytest tests/ -q` → **78 passed**. Acceptance
 matrix for **A1–A34** is in `ACCEPTANCE_MATRIX.md`. Recent additions: §15
 embedded-image visibility + no-model send block (A26–A28); the post-test fixes
 §7.10–§7.13 (A29–A32, incl. the shape-based heading fix); §16 message timestamps
-+ Markdown chat export (A33–A34). §17 is a titles-only stub for post-PoC
-direction (F1–F11).
++ Markdown chat export (A33–A34); §9.3 second CLI argument (A35). §17 is a
+titles-only stub for post-PoC direction (F1–F11).
 
-What has **never** been exercised: a **live model call** and **real documents**
-in the current runtime. A `.env` is configured (OpenRouter-compatible endpoint,
-2 model slugs), so the app boots with a working model picker.
+**Step 8 focused-vs-mixed evaluation RAN (2026-09-13),** on the re-uploaded
+corpus (four Workspaces, all docs indexed). Top-5 hit rate (hybrid):
 
-**Runtime `data/` is EMPTY** (only an app-bootstrapped `workspace_app.db`; no
-sources, no conversations). The corpus must be **re-uploaded** — via a terminal
-with the venv active — before Step 8 or the adversarial suite can run.
+| Run | Set | Hit rate |
+|---|---|---|
+| AML workspace | AML (6) | 6/6 = 100% |
+| HR workspace | HR (4) | 4/4 = 100% |
+| ITSEC workspace | SEC (5) | 5/5 = 100% |
+| All Policies (mixed) | all (15) | 14/15 = 93% |
+
+Focused 15/15 vs mixed 14/15 — a single-question difference (**essentially
+flat**). The one mixed miss: *"Who has the final say on telling the regulator
+about a breach?"* (expected `Incident_Response_Procedure.docx`; it passed in the
+focused ITSEC run). Interpretation per §9.3: the benefit of segregation appears
+to be the Instructions/Tasks effect (§3.2a), not retrieval. **No retrieval
+parameter was changed** — the owner decides next. Full detail in `changelog.md`.
+
+`data/` now holds the corpus (3+3+3+9 docs across four Workspaces). Do not clear
+it. A live model call has still not been exercised end-to-end in this runtime.
 
 ## Blocked on
 
-Step 8 needs: (1) the corpus re-uploaded per Workspace, (2) ground-truth
-questions in `tests/offline_retrieval_eval.py`, (3) a live model call.
+Step 8's numbers are recorded; the **next decision is the owner's** (whether the
+result changes anything — it does not motivate a retrieval-parameter change).
 
-**OPEN-14** (new): is the port already network-restricted? Owner is confirming
-with IT; do not answer. **OPEN-13** is deferred to the deployment layer.
-**OPEN-11** answered (OpenAI-compatible proxy). **OPEN-12/3/4/5/7** interim
-applied. **OPEN-4 is closed** (per-Workspace membership built). **OPEN-2** is
-updated-not-closed (context windows still 256k assumption).
+**OPEN-14**: is the port already network-restricted? Owner is confirming with IT;
+do not answer. **OPEN-13** deferred to the deployment layer. **OPEN-11** answered
+(OpenAI-compatible proxy). **OPEN-12/3/4/5/7** interim applied. **OPEN-4 closed**
+(per-Workspace membership built). **OPEN-2** updated-not-closed (context windows
+still 256k assumption).
 
 ## Step 8 — what you need to supply, run, and interpret
 
@@ -56,20 +68,16 @@ must be present in the serving interpreter or uploads fail.
 Manage → Knowledge → upload pdf/docx/xlsx per Workspace → *Process uploaded
 files* → confirm **indexed**. (First upload downloads `all-MiniLM-L6-v2` once.)
 
-### 2. Ground-truth questions (the CLI-arg change is DONE)
-`tests/offline_retrieval_eval.py` now takes the workspace_id as a CLI argument
-(§9.3). Only `QUESTION_SET` is empty — fill it with 10–15 questions per topic,
-each with `expected_source_substring`, then run:
-`python -m tests.offline_retrieval_eval <workspace_id>`.
+### 2. Ground-truth questions (DONE — run it any time)
+`tests/offline_retrieval_eval.py` takes **two** CLI arguments now: the
+workspace_id and a question set (`aml` / `hr` / `sec` / `all`). The three lists
+are populated. Run:
+`python -m tests.offline_retrieval_eval <workspace_id> <aml|hr|sec|all>`.
 
-### 3. Run the §3.2 focus-hypothesis protocol
-Mixed Workspace vs three focused Workspaces; compare top-5 hit rates.
-
-| Result | Conclusion |
-|---|---|
-| Focused beats mixed | Segregation helps retrieval. |
-| Focused ≈ mixed | Benefit is the Instructions/Tasks effect (§3.2a), not retrieval. |
-| Focused < mixed | Unexpected; capture and reconsider. |
+### 3. §3.2 focus-hypothesis protocol — RUN 2026-09-13
+Result: focused 15/15 (100%) vs mixed 14/15 (93%) — a single-question difference
+(essentially flat). Reading: the benefit of segregation is the Instructions/Tasks
+effect (§3.2a), not retrieval. No retrieval parameter changed; the owner decides.
 
 While you have a live endpoint: confirm each model's real `context_window_tokens`
 (OPEN-2) and correct `models/registry.py` if 256k is wrong.
@@ -88,7 +96,7 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 | §15 — Image visibility + no-model send block | Done |
 | §16 — Message timestamps + Markdown chat export | Done |
 | §17 — Post-PoC direction (titles-only stub) | Documented, not built (by direction) |
-| 8 — Evaluate (§9.3) | **Not started — needs corpus re-upload + live model call** |
+| 8 — Evaluate (§9.3) | **RUN (2026-09-13) — results recorded; owner decision pending** |
 
 ## Test status
 
@@ -102,7 +110,10 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-For the owner: re-upload the corpus (terminal with venv active), fill
-`QUESTION_SET` in `tests/offline_retrieval_eval.py`, then run
-`python -m tests.offline_retrieval_eval <workspace_id>` and the §3.2 protocol.
-There is no implementation work left that an agent can do without you.
+For the owner: **decide what (if anything) the flat §3.2 result changes** — the
+numbers do not motivate changing `top_k`/`MAX_RETRIEVED_TOKENS`/`rrf_k`/
+`candidate_pool`/chunk size, and no such change has been made. Remaining
+independent tasks: run the hand-checked negative control in chat; the adversarial
+suite (`adversarial_tests.md`, owner-run); confirm context windows against the
+live endpoint (OPEN-2). There is no implementation work left that an agent can do
+without you.

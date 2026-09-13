@@ -550,9 +550,11 @@ It depends on nothing in Steps 3–7 and blocks nothing in them.
 
 ### 9.3 Measuring whether Workspace focus improves accuracy
 
-`tests/offline_retrieval_eval.py` already implements the right shape of test: per question, did the expected source appear in top-5, under lexical / semantic / hybrid. It is currently hardcoded to `DEFAULT_WORKSPACE_ID` and has an empty `QUESTION_SET`.
+`tests/offline_retrieval_eval.py` already implements the right shape of test: per question, did the expected source appear in top-5, under lexical / semantic / hybrid.
 
-**Change required `[DERIVED]`:** accept `workspace_id` as a CLI argument rather than importing the constant, so it can be run per Workspace.
+**Change `[DERIVED]` (done):** the harness accepts `workspace_id` as a CLI argument rather than importing `DEFAULT_WORKSPACE_ID`, so it can be run per Workspace.
+
+**Change `[NEW]` (2026-09-13):** a **second CLI argument** selects which question set runs — `aml`, `hr`, `sec`, or `all` — over three named lists `AML_QUESTIONS`, `HR_QUESTIONS`, `SEC_QUESTIONS` plus the combined `QUESTION_SET`. This lets the same harness run a focused Workspace against its own domain's questions and the mixed Workspace against all of them, without editing the file between runs. The scoring logic, `TOP_K`, and everything in `retrieval/` are unchanged. (Acceptance criterion A35.)
 
 **Protocol to test the focus hypothesis** (requires real documents, so it cannot be run before the corpora exist):
 
@@ -628,6 +630,7 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 
 - A33. Every message in the UI shows its timestamp; stored `created_at` remains UTC, and the displayed value is the user's local time. Display-only — no schema change.
 - A34. An Owner/user can export the active Chat as a Markdown file containing, per turn, the question, the answer, the retrieved sources, the model (display name + slug), and the timestamp.
+- A35. `tests/offline_retrieval_eval.py` takes a second CLI argument (`aml` / `hr` / `sec` / `all`) selecting which of `AML_QUESTIONS` / `HR_QUESTIONS` / `SEC_QUESTIONS` / the combined set runs, without editing the file between runs; the scoring logic, `TOP_K`, and everything in `retrieval/` are unchanged.
 
 ---
 

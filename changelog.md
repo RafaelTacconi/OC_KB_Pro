@@ -7,6 +7,55 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-13 — Step 8: focused-vs-mixed retrieval evaluation (§9.3)
+
+Corpus re-uploaded (four Workspaces). The harness gained a second CLI argument
+(`aml`/`hr`/`sec`/`all`) selecting a question set, written into SPEC §9.3 first
+with criterion **A35**. `AML_QUESTIONS`/`HR_QUESTIONS`/`SEC_QUESTIONS` pasted from
+the owner's set; scoring logic, `TOP_K` and `retrieval/` unchanged.
+
+**Workspaces evaluated** (read-only; `data/` untouched):
+- AML Workspace (`aml-workspace`) — 3 docs
+- HR (`62ee0cd0d2324cd5ab5e20b70a8b27bc`) — 3 docs
+- ITSEC (`aa6dc06b19dd47e1a24d4855b951d24f`) — 3 docs
+- All Policies (`524bf0ec5c5f4290a80438fd801455ce`) — all 9 docs
+
+**Top-5 hit rate (hybrid), same questions, per Workspace:**
+
+| Run | Set | Result |
+|---|---|---|
+| AML workspace | AML (6) | **6/6 = 100%** |
+| HR workspace | HR (4) | **4/4 = 100%** |
+| ITSEC workspace | SEC (5) | **5/5 = 100%** |
+| All Policies | all (15) | **14/15 = 93%** |
+
+Focused total: **15/15 (100%)**. Mixed: **14/15 (93%)** — a **single** question
+difference.
+
+**The one miss (mixed Workspace):**
+- Question: *"Who has the final say on telling the regulator about a breach?"*
+- Expected: `Incident_Response_Procedure.docx`
+- Retrieved (hybrid top-5): `Security_Incident_Policy.pdf`, `AML_Policy.pdf`,
+  `Severity_Thresholds.xlsx`, `Security_Incident_Policy.pdf`,
+  `AML_Escalation_Procedure.docx`
+- Lexical: miss; Semantic: hit; Hybrid: **miss** (RRF dropped it). The same
+  question **passed** in the focused ITSEC Workspace.
+
+**Reading:** essentially flat. Focused segregation is ahead by one question in
+15, which is *not* a meaningful improvement — per SPEC §9.3 that points to the
+benefit coming from the Instructions/Tasks effect (§3.2a), not retrieval.
+**No retrieval parameter was changed** (`top_k`, `MAX_RETRIEVED_TOKENS`, `rrf_k`,
+`candidate_pool`, chunk sizes all untouched) — this is evidence for the owner to
+decide on.
+
+The negative control (no expected source) is excluded by design and checked by
+hand, not by this harness.
+
+**Schema and migration changes**
+- None.
+
+---
+
 ## 2026-09-13 — Documentation pass (spec amendments; no code)
 
 Owner-directed documentation-only amendments. **No application code and no test
