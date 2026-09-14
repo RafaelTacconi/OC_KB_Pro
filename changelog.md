@@ -7,6 +7,49 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-14 — Spec-only: activity logging (§19), service interface (§20), sequencing (§21), OPEN-15/16/17
+
+Owner-directed **specification pass. No application code and no test was touched.**
+
+- **SPEC §19 (new) — Activity logging (F4):** logs in a **separate SQLite file** (single-writer
+  contention, disposable, may hold text, needs its own retention/deletion); knowledge base,
+  chats, Workspace config, and membership stay in the **one** existing database separated by
+  `workspace_id` (single atomic Workspace delete; recorded as decided, not to be revisited on
+  tidiness grounds); **two tiers** — Tier 1 always-on metadata only, Tier 2 off-by-default
+  per-Workspace Owner switch storing question/answer text; **refusal rate** as the primary
+  metric; rotation **recommendation** (log DB alone, no per-session files — §19.4).
+- **SPEC §20 (new) — Service interface / API (F7):** division of responsibility; `POST
+  /v1/answer` request (`workspace_id`, `question`, optional `model`); **structured `sources`**
+  (document / section / page where supported), never a prose citation; **no `grounded` flag**
+  pending OPEN-15; caller credential + membership authorisation, gated on OPEN-13/OPEN-14;
+  empty-retrieval refusal; error matrix; per-caller rate limiting.
+- **SPEC §21 (new) — Build sequencing:** §19 logging first, §20 API second, monitoring
+  dashboard last and **deliberately unspecified** until real log data shows which figure is
+  actually used.
+- **SPEC §10 — acceptance criteria A42–A54** (A42–A47 logging; A48–A54 API). No existing
+  section or A-number renumbered.
+- **SPEC §11 — OPEN-15** (API `grounded` flag), **OPEN-16** (retrieval under pasted case
+  context), **OPEN-17** (chat retention) added; **OPEN-2** annotated as materially more serious
+  under §20 (confirm real `context_window_tokens` before the API is built). **None answered.**
+- **memory.md** — decision-log entries for OPEN-2 (addendum), OPEN-15, OPEN-16, OPEN-17; all
+  Authority: *Deferred — not reached*.
+
+**Schema and migration changes**
+- None. (A spec-only pass; §19's separate log database is specified, not built.)
+
+**Files modified**
+- `SPEC.md`, `memory.md`, `changelog.md`, `state.md`. **No code or test file was touched.**
+
+**Acceptance criteria**
+- New: A42–A54. None implemented (spec-only); all prior criteria still green.
+
+**Known-broken / deferred**
+- Everything in §19/§20 is specified and **not built**. OPEN-15/16/17 remain unanswered.
+
+**Tests:** `python -m pytest tests/ -q` → **79 passed** (unchanged).
+
+---
+
 ## 2026-09-13 — New-chat selection fix (§7.14) + grounding rules in the system prompt (§18)
 
 Two owner-directed jobs. **Spec written first for both** (`[NEW]` §7.14 / A36; §18 / A37–A41),

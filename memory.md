@@ -173,6 +173,45 @@ reachable, self-declared identity is not an access control at all. Related to OP
 the same question — OPEN-13 asks whether a gate is needed, OPEN-14 asks whether one already
 exists.
 
+### OPEN-2 — `call_model` signature and registry accuracy — 2026-09-14 (addendum; neither entry above changes)
+Question: Are the 256k context figures in `models/registry.py` correct?
+Outcome: Still open — the real `context_window_tokens` per model is unconfirmed; 256k remains
+an assumption. **Raised in severity by SPEC §20:** a calling system pasting case context can
+exceed the real limit and the provider will reject the request. It must be confirmed against the
+live endpoint **before the API is built**.
+Authority: Deferred — not reached.
+Consequence: `fits_in_context()` keeps using 256k; §20 must not ship on that assumption.
+
+### OPEN-15 — Should the API response include a `grounded` flag? — 2026-09-14
+Question: Should the §20 API response include a `grounded: true/false` flag?
+Outcome: Deferred — not reached. All three options recorded: (a) parse the model's own
+"(Source: …)" text — the approach rejected for the citation chips (§7.11); (b) ask the model to
+declare its own honesty; (c) return `sources` and let the caller decide from an empty list. None
+chosen; §20.3 forbids adding the field until this is answered.
+Authority: Deferred — not reached.
+Consequence: A wrong flag is worse than no flag because a calling system branches on it
+automatically with no human reading the answer — higher-stakes than the chip relabelling was.
+
+### OPEN-16 — Retrieval under pasted case context — 2026-09-14
+Question: Does retrieval degrade when case context is pasted into the question (§20.1, §20.2)?
+Outcome: Deferred — not reached. Unmeasured risk. Search uses the ENTIRE question text as the
+query, so account numbers, amounts, and dates become search terms that appear nowhere in the
+procedures; retrieval may get worse exactly when the question is richest. Must be measured
+(short / medium / long context) before the §20 API design is finalised.
+Authority: Deferred — not reached.
+Consequence: The intended API workflow (caller pre-processes a case and sends it inline) rests
+on an untested assumption about retrieval quality.
+
+### OPEN-17 — Chat retention — 2026-09-14
+Question: Should only the last 10 conversations be kept?
+Outcome: Deferred — not reached. Both positions recorded: (a) cap at 10 to keep the selector
+manageable; (b) do not delete — chats are plain text, storage is not the constraint, and
+deleting a user's work to reclaim space that was never short is a poor trade. The cluttered
+selector is a display concern (show recent, collapse the rest), compounded by the missing
+delete action (OPEN-6 / OPEN-8).
+Authority: Deferred — not reached.
+Consequence: No retention policy and no deletion are built.
+
 ---
 
 ## Codebase discoveries

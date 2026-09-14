@@ -651,6 +651,25 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A40. Two sources are described as agreeing or disagreeing only when BOTH address the subject; when only one does, the answer says so.
 - A41. A question with several possible answers gets all of them, labelled, or a request to clarify — never one picked silently.
 
+**Activity logging** (§19) — decided; not built.
+
+- A42. Logs are written to their own SQLite database, separate from the knowledge-base database: the main database gains no log table, the log database holds no knowledge-base, chat, Workspace-configuration, or membership rows, and a burst of logging can never block a chat/API question through SQLite's single-writer lock on the main database. The log database is never part of a knowledge-base backup.
+- A43. Knowledge base, chats, Workspace configuration, and membership stay in the one existing database, separated by `workspace_id`; deleting a Workspace remains a single atomic action. (Decided; recorded so it is not revisited on tidiness grounds.)
+- A44. Tier 1 logging is always on and records exactly the metadata fields listed in §19.2 — never question or answer text — and contains nothing privacy-sensitive, so it may be retained freely.
+- A45. Tier 2 logging is OFF by default; it is enabled per Workspace by that Workspace's Owner, records question text, answer text, and retrieved chunk identifiers only while enabled, and the UI states plainly what is stored while it is on.
+- A46. The refusal rate is computable from Tier 1 alone: the per-turn row records `workspace_id`, a timestamp, and an `outcome` distinguishing `answered` from `refused` and `error`, so the rate can be sliced by Workspace and over time. (Determining `refused` depends on a refusal signal — see OPEN-15.)
+- A47. Log storage is the SQLite log database alone, with no per-session text files; retention and deletion act on that database independently of the knowledge-base database. (Recommendation recorded per §19.4.)
+
+**Service interface** (§20) — specified; not built.
+
+- A48. The API's division of responsibility is stated: OC_KB_Pro owns Workspace/document isolation, ingestion and indexing, retrieval, grounded answer generation, citation selection, refusal when the documents do not support an answer, Workspace instructions, and knowledge-base access control; the calling system owns the case/task, customer/account/transaction data, workflow state, business logic, question choice, handling of the answer, actions, human approval, and outcome recording.
+- A49. The endpoint accepts a request identifying the Workspace (`workspace_id`, not name — names are non-unique, OPEN-5), the question, and an optional model; a malformed or incomplete request is rejected with a documented `400`.
+- A50. A successful response returns the answer text and structured sources — document, section, and page where the source format supports it — never a prose citation; the response contains no `grounded` flag (deferred to OPEN-15), and an empty `sources` list is the only interim signal.
+- A51. A caller is identified by an API credential mapped to Workspace memberships; an unknown or invalid caller is rejected. The API is a post-PoC surface and MUST NOT be built or exposed until OPEN-13 and OPEN-14 are resolved; constraint C6's no-authentication rule governs the in-app UI only.
+- A52. When retrieval finds nothing, the response is the documented refusal with an empty `sources` list, and no content is fabricated.
+- A53. Bad Workspace, unknown caller, provider failure, oversized request, no model configured, and malformed request each return a distinct documented HTTP status and machine-readable error code, with no stack traces.
+- A54. Rate limiting is specified as required and per-caller, with the reason recorded (a single shared provider credential and the SQLite single writer); the limit value is a deployment parameter, not fixed here.
+
 ---
 
 ## 11. Open questions
@@ -660,7 +679,7 @@ Consolidated. Each must be answered by the project owner; none should be resolve
 | # | Question | Interim behaviour | Why it matters |
 |---|---|---|---|
 | **OPEN-1** | Where is spec v2? Section references throughout the code are unverifiable without it. | Treat the code's docstrings as the authority. | This document may contradict v2 in ways nobody can currently detect. |
-| **OPEN-2** | Is the `call_model(prompt, model_id)` widening of constraint C4 approved? Are the `provider_model_name` slugs and the 256k context figures in `models/registry.py` correct? | **Updated, not closed, by Addendum A (§14).** The widening is now confirmed — §14.4 mandates `call_model(prompt, model_id) -> str` stays as the single call site with an unchanged signature, and real slugs / base URL / key are supplied via `.env` (§14.3). What remains open: confirming each model's real `context_window_tokens` against the actual endpoint. | The registry's context-window numbers feed `fits_in_context()`. Wrong numbers mean a wrong guard. |
+| **OPEN-2** | Is the `call_model(prompt, model_id)` widening of constraint C4 approved? Are the `provider_model_name` slugs and the 256k context figures in `models/registry.py` correct? | **Updated, not closed, by Addendum A (§14).** The widening is now confirmed — §14.4 mandates `call_model(prompt, model_id) -> str` stays as the single call site with an unchanged signature, and real slugs / base URL / key are supplied via `.env` (§14.3). What remains open: confirming each model's real `context_window_tokens` against the actual endpoint. | The registry's context-window numbers feed `fits_in_context()`. Wrong numbers mean a wrong guard. **Under §20 this becomes materially more serious:** a calling system pasting case context can exceed the real limit and the provider will reject the request. The real `context_window_tokens` must be confirmed against the live endpoint **before the API is built**. |
 | **OPEN-3** | **Does a Chat's prior turns go into the prompt?** (§3.3, §6.5) | Option A — no history in prompt. | Determines whether "multiple Chats" is a context-management feature or a UI organisation feature. Changes the v2 assembly order if Option B. |
 | **OPEN-4** | Who is a member of a newly created Workspace? (§5.3) | All `TEST_USERS`, mirroring the existing seed. | Under the interim rule an Owner cannot create a private Workspace. |
 | **OPEN-5** | Should Workspace names (and Task names) be unique? | Not enforced. | Duplicate names in a selectbox are indistinguishable to the user. |
@@ -673,6 +692,9 @@ Consolidated. Each must be answered by the project owner; none should be resolve
 | **OPEN-12** | Who sees the pre-expiry warning? (§14.5) | `expiring`/`unknown` to Owners; `expired` to everyone. | Members cannot renew a key, but they are the ones whose chat breaks when it lapses. |
 | **OPEN-13** | The internally deployed app has no authentication — anyone reaching the port can sign in as Owner and manage or delete any Workspace. Is the host network-restricted, or does the PoC need a gate before deployment? (§14.1) | None. Flagged only. Do not build authentication. | Constraint C6 was written for laptop testing with three users, not for a deployed internal host. |
 | **OPEN-14** | Is the Streamlit port network-restricted to entitled users, or merely reachable on the internal network by anyone who knows the address? | Unverified; treat "anyone who can open the app is already authorised" as an assumption, not a fact. | §17 F10's identity model rests entirely on this premise. If the port is merely reachable, self-declared identity is not an access control at all. Related to OPEN-13 but not the same question — OPEN-13 asks whether a gate is needed, OPEN-14 asks whether one already exists. |
+| **OPEN-15** | Should the API response include a `grounded: true/false` flag? (§20.3) | None. Do not add the field. | A calling system branches on it automatically, with no human reading the answer, so a wrong flag is worse than no flag. The application cannot observe whether an answer was grounded: it could only **parse the model's own "(Source: …)" text** — the approach explicitly rejected for the citation chips (§7.11) — or **ask the model to declare its own honesty**. A third option is to return `sources` and let the caller decide from an empty list. Higher-stakes than the chip relabelling was, because no human sees the answer. Undecided. |
+| **OPEN-16** | Does retrieval degrade when case context is pasted into the question? (§20.1, §20.2) | Unmeasured. Assume it may. | The intended workflow pre-processes a case externally and sends a question containing the case context inline, but search uses the ENTIRE question text as the query — so account numbers, amounts, and dates become search terms that appear nowhere in the procedures. Retrieval may get worse exactly when the question is richest. Needs measuring (short / medium / long context) before the API design is finalised. |
+| **OPEN-17** | Chat retention — keep only the last 10 conversations? | Nothing deleted; no cap. | Chats are plain text and storage is not the constraint, so deleting a user's work to reclaim space that was never short is a poor trade. The real problem is a cluttered selector, which is a **display** concern (show recent, collapse the rest), compounded by the missing delete action (OPEN-6 / OPEN-8). Both positions recorded; undecided. |
 
 ---
 
@@ -1075,3 +1097,310 @@ repository root. Acceptance criteria: A37–A41.
 The fix is **prompt-level only**: `retrieval/`, `top_k`,
 `MAX_RETRIEVED_TOKENS`, `rrf_k`, `candidate_pool`, and chunk sizes are NOT
 touched.
+
+---
+
+## 19. Activity logging (F4)
+
+Specified 2026-09-14 at the project owner's direction. **Spec-only — nothing here
+is built.** There is currently no logging of any kind. Tag conventions as per §0.1.
+
+### 19.1 Storage: logs in a separate database; everything else stays in one
+
+**Logs live in their own SQLite database file, separate from the knowledge-base
+database.** The reason is technical, not tidiness:
+
+- SQLite permits **one writer at a time**. Log writes are frequent, small and
+  constant, while knowledge-base writes are occasional. Sharing a file would let a
+  burst of logging block a user's question — and the problem worsens once an API
+  (§20) is calling the service.
+- Logs are **disposable** and grow far faster than anything else; they need their
+  own retention and deletion.
+- Tier 2 logs (§19.2) may hold **question and answer text**, so they must be
+  deletable independently and must **never** be part of a backup of the knowledge
+  base.
+
+**Everything else stays in the one existing database** — knowledge base, chats,
+Workspace configuration, and membership — separated by `workspace_id` exactly as
+today. They share a lifecycle, are read and written together, and deleting a
+Workspace must remain a single atomic action. Splitting them would add a failure
+mode (partial deletes, orphaned rows) to solve a problem that does not exist at
+this scale. **Recorded as decided so it is not revisited on aesthetic grounds.**
+
+**Consequences:**
+
+- The main database gains **no** `logs` table; the log database holds **no**
+  knowledge-base, chat, Workspace-configuration, or membership rows.
+- SQLite foreign keys do not cross database files, so `workspace_id`, `chat_id`,
+  and the caller identifier are recorded in logs as **plain values, not foreign
+  keys**. No cascade, no referential integrity, by design.
+- The log database is opened and written independently of `db.get_connection()`;
+  a logging failure must never fail a question.
+- The knowledge-base backup is scoped to the main database and the uploaded
+  sources; the log database is excluded from it.
+
+### 19.2 Two tiers `[NEW]`
+
+**Tier 1 — ALWAYS ON, metadata only, no question or answer text:**
+
+| Field | Recorded value |
+|---|---|
+| `timestamp` | UTC instant the turn completed (same clock as §16.1) |
+| `workspace_id` | plain value (no cross-database FK) |
+| `requester` | `user_id` for UI calls; caller identifier for API calls |
+| `source` | `"ui"` or `"api"` |
+| `chat_id` | where applicable (UI); absent for API calls |
+| `question_chars` | length of the question in characters — never the text |
+| `chunks_retrieved` | number of chunks retrieved |
+| `lexical_degrade` | whether the §7.3 lexical-only path was used |
+| `model_slug` | the provider slug actually used |
+| `retrieval_ms` | retrieval time |
+| `total_ms` | total response time |
+| `outcome` | `answered` / `refused` / `error` |
+| `error_type` | where `outcome = error` |
+
+Tier 1 must contain **nothing privacy-sensitive**, so it can be retained freely.
+An `outcome` of `refused` (§19.3) is a completed turn, **not** an error.
+
+**Tier 2 — OFF BY DEFAULT, per-Workspace, question and answer text:**
+
+- Records the full question text, the full answer text, and the retrieved chunk
+  identifiers.
+- Enabled **per Workspace by that Workspace's Owner**, in Manage.
+- While it is on, the UI must state **plainly** what is being stored.
+- Intended for diagnosing one specific bad answer, then switched off again.
+- Tier 1 and Tier 2 are independent: turning Tier 2 off leaves Tier 1 recording.
+
+**Who may switch it:** the **Owner** of the Workspace. A non-owner cannot enable
+or disable it.
+
+**Who is told (proposed — owner to confirm, not marked OPEN):** every user of
+that Workspace should see a persistent caption while Tier 2 is on, because their
+question text is being stored. The proposal is that notification is mandatory;
+the owner may override.
+
+### 19.3 The primary metric: refusal rate `[NEW]`
+
+The proportion of questions answered with the refusal — "the documents do not
+cover this". **A rising refusal rate means either a gap in the documents or a
+regression in retrieval.** Tier 1 must therefore capture enough to compute it:
+`outcome`, `workspace_id`, and `timestamp` are the minimum, so the rate can be
+sliced per Workspace and over time.
+
+**Observability caveat (ties to OPEN-15).** The application cannot itself observe
+whether an answer is grounded or a refusal: it would have to parse the model's own
+"(Source: …)" text (rejected for the citation chips, §7.11) or ask the model to
+declare its own honesty. Tier 1 therefore **records** the `refused` value, but the
+mechanism that reliably produces it is the same unanswered question as OPEN-15 and
+is **not decided here**. Until it is, `refused` may be unavailable, and the rate
+computed from whichever signal the owner chooses.
+
+### 19.4 Rotation and retention — recommendation `[NEW]`
+
+The owner's earlier idea was one file per session, `log_KB_yyyymmdd_hhmmss.log`.
+**Recommendation: use the SQLite log database alone. Do not also write
+per-session text files.**
+
+Reasons:
+
+1. SQLite already provides durability, ordering, indexed queries, and cheap
+   deletion/pruning by time or Workspace. A second plaintext copy duplicates every
+   field — including Tier 2 question/answer text — doubling the deletion surface
+   and letting the two copies drift.
+2. The one-writer concern that justified a separate database is solved by the
+   database. Per-session files reintroduce concurrent writers (several sessions
+   writing files at once) and give up the single-writer serialisation entirely.
+3. Per-session files fragment the data: computing the refusal rate would mean
+   scanning many files, where a database query is one statement.
+4. Rotation in SQLite is **time-partitioning and pruning**, not per-session files:
+   prune rows older than the retention window, or roll to a dated database file
+   (e.g. monthly). That is a retention decision, not a file-naming one.
+
+If a human needs a live tail for hands-on troubleshooting, a **single** rolling
+plaintext file is acceptable only as a **derived, non-authoritative convenience**;
+it must never hold Tier 2 text, and the database remains the system of record. The
+recommendation is that it is not needed.
+
+**Retention (proposed, not decided):** Tier 1 retained freely (it is
+non-sensitive); Tier 2 deleted under its own policy and always deletable per
+Workspace. The exact window is not fixed here.
+
+### 19.5 Explicitly out of scope for this section
+
+- The monitoring dashboard — deliberately deferred, see §21.
+- Log streaming, external log sinks, or shipping logs off the host.
+- Tier 2 logging enabled by default, or enabled by anyone other than the
+  Workspace Owner.
+- Recording the question or answer text in Tier 1 under any circumstances.
+
+**Acceptance criteria:** A42–A47 (§10).
+
+---
+
+## 20. Service interface (API) (F7)
+
+Specified 2026-09-14 at the project owner's direction. **Spec-only — not built.**
+This is where the tool's real value is: another application asks this service a
+question and uses the grounded answer. Tag conventions as per §0.1.
+
+### 20.1 Division of responsibility `[NEW]`
+
+**OC_KB_Pro owns:** Workspace and document isolation; ingestion and indexing;
+retrieval; grounded answer generation; citation selection; refusal when the
+documents do not support an answer; Workspace-specific instructions; access control
+around the knowledge base.
+
+**The calling system owns:** the case or task itself; customer / account /
+transaction data; workflow state and business logic; deciding which question to
+ask; deciding what to do with the answer; executing actions; human approval;
+recording the outcome.
+
+The service answers questions about documents. It does not know the case, does not
+act, and does not decide what the caller should do. Case context reaches it only if
+the caller puts it in the question — which is exactly the risk recorded as OPEN-16.
+
+### 20.2 Endpoint and request `[NEW]`
+
+A single endpoint, `POST /v1/answer`, `Content-Type: application/json`.
+
+```
+{
+  "workspace": "<workspace_id>",
+  "question":  "<question text>",
+  "model":     "<model_id>"          // optional; the configured default when absent
+}
+```
+
+- `workspace` is the **`workspace_id`**, not the name — names are non-unique
+  (OPEN-5) and must not be an addressing key over the API.
+- `model` is optional; when absent the configured default model is used, exactly
+  as the UI's picker default is (§14.3).
+- No conversation history is sent: §6.5 / OPEN-3 Option A stands — every turn is
+  answered independently.
+
+### 20.3 Response `[NEW]`
+
+```
+{
+  "answer":  "<answer text>",
+  "sources": [
+    { "document": "Incident_Response_Procedure.docx",
+      "section":  "3. Escalation Timeline",
+      "page":     4 }
+  ]
+}
+```
+
+- `sources` is **structured data, not a prose citation**: the document, the
+  section, and the page **where the source format supports it** (PDF). `section`
+  and `page` may be `null` (e.g. XLSX, or a document with no detected heading).
+- `sources` is the **retrieved set** — the same set the UI shows as "Retrieved
+  from" (§7.11) — not text parsed out of the model's answer. Parsing the model's
+  prose citations was rejected for the chips and stays rejected here.
+- **No `grounded` flag.** Whether the response should carry a `grounded:
+  true/false` is OPEN-15; until it is answered, the only groundedness signal is an
+  empty `sources` list. Do not add the field (A50).
+
+### 20.4 Caller identity and authorisation `[NEW]`
+
+- A caller is identified by an **API credential** presented with the request, not
+  by a self-declared user id. The credential maps to an identity and to a set of
+  Workspace memberships; a caller may query only a Workspace it is a member of.
+- Unknown or invalid credential → `401`. A Workspace outside the caller's
+  membership → `404` (not `403`), so the service does not disclose which
+  Workspaces exist.
+- **Relationship to C6 / OPEN-13 / OPEN-14:** constraint C6 ("no authentication")
+  governs the **in-app UI**, a laptop PoC with three hardcoded users. The API is a
+  different surface, called by other systems with no human in the loop. It MUST
+  NOT be built or exposed until OPEN-13 (is a gate needed?) and OPEN-14 (does one
+  already exist?) are resolved. This section specifies the design; it does not
+  authorise the build.
+- The credential is stored outside the repository and outside the database, as
+  `.env` values are (§14.2). It is never logged: Tier 1 records the caller
+  identifier, not the credential.
+
+### 20.5 When retrieval finds nothing `[NEW]`
+
+If retrieval returns no chunks, the response is the documented refusal
+("the documents do not cover this") with `sources: []`, and **no content is
+fabricated**. A short-circuit that skips the model call is a permissible
+implementation and must not change the observable response; whether the model is
+called at all is an implementation choice, not a contract.
+
+### 20.6 Errors `[NEW]`
+
+Every error returns `Content-Type: application/json`:
+
+```
+{ "error": { "code": "<machine_code>", "message": "<human text>" } }
+```
+
+and **never** a stack trace — the same no-crash principle as §7.1.
+
+| Condition | HTTP | `code` |
+|---|---|---|
+| malformed JSON, or missing `question`/`workspace` | 400 | `invalid_request` |
+| unknown or inaccessible `workspace` | 404 | `workspace_not_found` |
+| unknown or invalid caller | 401 | `unauthenticated` |
+| no model configured | 503 | `model_unavailable` |
+| provider failure or timeout | 502 | `provider_error` |
+| request or question exceeds the accepted size | 413 | `request_too_large` |
+| rate limit exceeded | 429 | `rate_limited` |
+
+Retrieval degrading to lexical-only (§7.3) is **not** an error: the request
+succeeds and the answer is produced from lexical results. The degrade is recorded
+in Tier 1 (`lexical_degrade`), not surfaced as a failure.
+
+### 20.7 Rate limiting `[NEW]`
+
+**Needed, per caller.** Reasons:
+
+- One **shared provider credential** backs every model call. A single runaway
+  caller can exhaust the key and deny the service to everyone else — no human is
+  pacing an API.
+- SQLite permits **one writer at a time** on both databases; an unpaced caller can
+  keep the writers busy.
+- Accidental loops (a caller retrying on any non-200) are the common case; a limit
+  turns them into a visible `429` rather than a silent outage.
+
+A simple fixed-window per-caller limit (requests per minute) is sufficient at this
+scale. The **value is a deployment parameter**, not fixed here. The limit may live
+in the service or at the network layer in front of it; either is acceptable, and
+this does not prescribe which.
+
+### 20.8 Explicitly out of scope for this section
+
+- Streaming responses (already out of scope, §12).
+- Batch or asynchronous endpoints, webhooks, or callbacks.
+- Cross-Workspace queries (OPEN-10).
+- Persisting API calls as Chats, or any chat lifecycle for API calls.
+- Conversation history in the request (§6.5 / OPEN-3 Option A).
+- The `grounded` flag (OPEN-15).
+- Choosing an API-key-management product or an authentication scheme — that is
+  OPEN-13/OPEN-14 and, post-PoC, §17 F10.
+- MCP transport specifics: F7 names "API / MCP"; this section specifies the answer
+  contract, which either transport would carry. Do not build either yet.
+
+**Acceptance criteria:** A48–A54 (§10).
+
+---
+
+## 21. Build sequencing for logging, API, and dashboard
+
+Decided 2026-09-14. **This section carries no acceptance criteria**; it records the
+order and the reasoning so it is not reopened later.
+
+1. **§19 — activity logging, first.** A service that cannot be measured,
+   troubleshot, or calibrated must not be exposed to other systems. Logging first
+   means the API (§20) is born observable: every API call lands in Tier 1 from its
+   first request, and the refusal rate is available from day one.
+2. **§20 — service interface, second.** Built on top of the logging, so its
+   behaviour is recorded and auditable from the start.
+3. **The monitoring dashboard — last, and deliberately not specified yet.**
+   Designing a dashboard before real log data exists means guessing which figures
+   matter. The plan is: build the logging, run it, and see which number is
+   repeatedly looked up. **A dashboard spec is deferred until then.**
+
+Note on naming: §17's F11 as listed is the in-app user guide; the monitoring
+dashboard is the adjacent deferred item the owner has in mind. It is neither built
+nor specified here.

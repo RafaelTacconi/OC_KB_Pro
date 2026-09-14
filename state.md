@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-13 — Steps 1–7 + §14/§15/§16 done; **Step 8 focused-vs-mixed evaluation RUN** (results recorded); **new-chat selection fix (§7.14/A36) + grounding rules (§18/A37–A41) DONE**; decision pending.
+**Last updated:** 2026-09-14 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN (results recorded); **spec-only pass added §19 logging, §20 API, §21 sequencing + OPEN-15/16/17 — nothing built yet**; owner review pending.
 
 ---
 
@@ -19,6 +19,12 @@ selection fix); §16 message timestamps + Markdown chat export (A33–A34); §9.
 second CLI argument (A35); §18 grounding rules in `SYSTEM_POLICY` (A37–A41,
 prompt-level only, hand-verified via `GROUNDING_REGRESSION.md`). §17 is a
 titles-only stub for post-PoC direction (F1–F11).
+
+**Newly specified, NOT built (spec-only pass 2026-09-14):** §19 Activity logging
+(F4), §20 Service interface / API (F7), §21 build sequencing, and criteria
+A42–A54. Review these in `SPEC.md` before any implementation. The chosen order is
+§19 first, §20 second, monitoring dashboard last (unspecified until real log data
+exists).
 
 **Step 8 focused-vs-mixed evaluation RAN (2026-09-13),** on the re-uploaded
 corpus (four Workspaces, all docs indexed). Top-5 hit rate (hybrid):
@@ -49,7 +55,9 @@ result changes anything — it does not motivate a retrieval-parameter change).
 do not answer. **OPEN-13** deferred to the deployment layer. **OPEN-11** answered
 (OpenAI-compatible proxy). **OPEN-12/3/4/5/7** interim applied. **OPEN-4 closed**
 (per-Workspace membership built). **OPEN-2** updated-not-closed (context windows
-still 256k assumption).
+still 256k assumption; now blocks §20). **OPEN-15/16/17** newly recorded
+(API `grounded` flag; retrieval under pasted case context; chat retention) — none
+answered; none blocks building §19.
 
 ## Step 8 — what you need to supply, run, and interpret
 
@@ -99,6 +107,9 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 | §16 — Message timestamps + Markdown chat export | Done |
 | §7.14 — New-chat selection after first question (A36) | Done |
 | §18 — Grounding rules in the system prompt (A37–A41) | Done (prompt-level only; hand-verified) |
+| §19 — Activity logging (A42–A47) | **Specified (2026-09-14), not built** |
+| §20 — Service interface / API (A48–A54) | **Specified (2026-09-14), not built** |
+| §21 — Build sequencing (logging → API → dashboard) | **Recorded (2026-09-14); no criteria** |
 | §17 — Post-PoC direction (titles-only stub) | Documented, not built (by direction) |
 | 8 — Evaluate (§9.3) | **RUN (2026-09-13) — results recorded; owner decision pending** |
 
@@ -106,7 +117,7 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 
 ```
 python -m pytest tests/ -q
-79 passed   (2026-09-13)
+79 passed   (2026-09-14, unchanged — spec-only pass)
 ```
 The conftest `data/` guard is snapshot-based: a pre-existing `data/` from a
 stopped app is tolerated; the suite fails only if the TESTS create/modify/delete
@@ -114,11 +125,11 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-For the owner: **decide what (if anything) the flat §3.2 result changes** — the
-numbers do not motivate changing `top_k`/`MAX_RETRIEVED_TOKENS`/`rrf_k`/
-`candidate_pool`/chunk size, and no such change has been made. Remaining
-independent tasks: run the hand-checked negative control in chat; re-run the
-seven-case grounding regression set (`GROUNDING_REGRESSION.md`, owner-run, needs a
-live endpoint) to confirm A37–A41 now hold; confirm context windows against the
-live endpoint (OPEN-2). There is no implementation work left that an agent can do
-without you.
+For the owner: **read and correct `SPEC.md` §19 / §20 / §21** before any build.
+Nothing there is implemented. Once approved, the build order is fixed: **§19
+activity logging first** (a service must be measurable before it is exposed),
+then §20 API, then — much later and only after real log data exists — a
+monitoring dashboard. Independent remaining tasks unchanged: re-run the
+seven-case grounding regression set (`GROUNDING_REGRESSION.md`, needs a live
+endpoint) to confirm A37–A41; confirm context windows against the live endpoint
+(OPEN-2, now blocking §20); decide what the flat §3.2 result changes.
