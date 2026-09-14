@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-14 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN (results recorded); **spec-only pass added §19 logging, §20 API, §21 sequencing + OPEN-15/16/17 — nothing built yet**; owner review pending.
+**Last updated:** 2026-09-14 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN (results recorded); spec-only §19/§20/§21 added (nothing built); **README rewritten around the service purpose; matrix retitled A1–A54**; owner review pending.
 
 ---
 
@@ -25,6 +25,10 @@ titles-only stub for post-PoC direction (F1–F11).
 A42–A54. Review these in `SPEC.md` before any implementation. The chosen order is
 §19 first, §20 second, monitoring dashboard last (unspecified until real log data
 exists).
+
+**README.md** now explains the tool for a first-time reader: what it is (refusal
+is the point), how it works, its scope vs the calling system, honest status, known
+limitations, and the launch warning. `ACCEPTANCE_MATRIX.md` covers A1–A54.
 
 **Step 8 focused-vs-mixed evaluation RAN (2026-09-13),** on the re-uploaded
 corpus (four Workspaces, all docs indexed). Top-5 hit rate (hybrid):
@@ -117,8 +121,11 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 
 ```
 python -m pytest tests/ -q
-79 passed   (2026-09-14, unchanged — spec-only pass)
+79 passed   (2026-09-14, docs-only pass)
 ```
+Known flake (see memory.md): `test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
+failed once under a slow (68s) run, passes in isolation; suspected timeout, not
+diagnosed.
 The conftest `data/` guard is snapshot-based: a pre-existing `data/` from a
 stopped app is tolerated; the suite fails only if the TESTS create/modify/delete
 repo `data/`. Run the suite with the app **stopped**.

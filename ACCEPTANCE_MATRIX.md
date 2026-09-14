@@ -1,10 +1,11 @@
-# Acceptance matrix — A1–A41
+# Acceptance matrix — A1–A54
 
-Verified 2026-09-13 against current `main` (Steps 1–7 complete, §14/§15/§16
-work; Step 8 run; §7.14/A36 and §18/A37–A41 added). Method: each criterion is
-mapped to the test(s) that prove it, or is marked *not verifiable* with the
-reason. The full suite (**79 passed**) runs from a clean clone: `git clone` →
-fresh venv → `pip install -r requirements.txt` → `python -m pytest tests/ -q`.
+Verified 2026-09-14 against current `main` (Steps 1–7 complete, §14/§15/§16 work;
+Step 8 run; §7.14/A36, §18/A37–A41, and the spec-only §19/A42–A47 and §20/A48–A54
+passes). Method: each criterion is mapped to the test(s) that prove it, or is
+marked *not verifiable* / *specified, not built* with the reason. The full suite
+(**79 passed**) runs from a clean clone: `git clone` → fresh venv →
+`pip install -r requirements.txt` → `python -m pytest tests/ -q`.
 
 ## Multi-Workspace (SPEC §5)
 
@@ -100,6 +101,35 @@ in `GROUNDING_REGRESSION.md`.
 | A39 | Document silence never presented as a rule — "not stated" is not "continuous"/"always"/"never"/"no exception" | `GROUNDING_REGRESSION.md` G3, G6 (hand-run) + `SYSTEM_POLICY` rule 3 | ✅ *hand-run only* |
 | A40 | Two sources called agreeing/disagreeing only when BOTH address the subject; when only one does, say so | `GROUNDING_REGRESSION.md` G7 (hand-run) + `SYSTEM_POLICY` rule 4 | ✅ *hand-run only* |
 | A41 | A multi-answer question gets all answers, labelled, or a request to clarify — never one picked silently | `GROUNDING_REGRESSION.md` G1 (hand-run) + `SYSTEM_POLICY` rule 5 | ✅ *hand-run only* |
+
+## Activity logging (SPEC §19) — specified 2026-09-14, NOT built
+
+All rows below are specification only. There is no logging code; proof is the
+specified behaviour in `SPEC.md` §19.
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A42 | Logs in their own SQLite DB; main DB gains no log table; log DB holds no KB/chat/config/membership rows; a logging burst cannot block a question; log DB never in a KB backup | `SPEC.md` §19.1 | *specified, not built* |
+| A43 | Knowledge base, chats, Workspace config, and membership stay in the one DB separated by `workspace_id`; Workspace delete remains a single atomic action | `SPEC.md` §19.1 | *specified, not built* |
+| A44 | Tier 1 always on, exactly the listed metadata fields, never question/answer text, non-sensitive, retained freely | `SPEC.md` §19.2 | *specified, not built* |
+| A45 | Tier 2 off by default, enabled per Workspace by its Owner, stores Q/A + chunk ids only while on, UI states plainly what is stored | `SPEC.md` §19.2 | *specified, not built* |
+| A46 | Refusal rate computable from Tier 1 (`workspace_id`, timestamp, `outcome` ∈ answered/refused/error), sliceable per Workspace over time | `SPEC.md` §19.3 | *specified, not built* |
+| A47 | Log storage is the DB alone (no per-session files); retention/deletion independent of the KB DB | `SPEC.md` §19.4 | *specified, not built* |
+
+## Service interface / API (SPEC §20) — specified 2026-09-14, NOT built
+
+All rows below are specification only. No endpoint exists; proof is the specified
+behaviour in `SPEC.md` §20.
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A48 | Division of responsibility stated (service vs calling task/workflow system) | `SPEC.md` §20.1 | *specified, not built* |
+| A49 | Request identifies Workspace (`workspace_id`, not name), question, optional model; malformed → documented `400` | `SPEC.md` §20.2, §20.6 | *specified, not built* |
+| A50 | Response returns answer + structured `sources` (document/section/page where supported); no `grounded` flag; empty `sources` is the interim signal | `SPEC.md` §20.3 | *specified, not built* |
+| A51 | Caller identified by API credential mapped to Workspace membership; API not built/exposed until OPEN-13/OPEN-14 resolved; C6 no-auth is UI-only | `SPEC.md` §20.4 | *specified, not built* |
+| A52 | Empty retrieval → documented refusal + `sources: []`, nothing fabricated | `SPEC.md` §20.5 | *specified, not built* |
+| A53 | Distinct documented status/code for bad Workspace, unknown caller, provider failure, oversized request, no model, malformed request; no stack traces | `SPEC.md` §20.6 | *specified, not built* |
+| A54 | Rate limiting required and per-caller (shared provider key + SQLite single writer); limit value is a deployment parameter | `SPEC.md` §20.7 | *specified, not built* |
 
 ## Not verifiable without owner inputs
 

@@ -463,6 +463,14 @@ constant (`top_k`, `MAX_RETRIEVED_TOKENS`, `rrf_k`, `candidate_pool`, chunk size
 touched. The seven are kept as a named hand-run regression set in `GROUNDING_REGRESSION.md`; no
 automated test may call the live model.
 
+### 2026-09-13 — Flaky test: `test_chat_error_handling.py` failed once under load (open reliability question)
+`tests/test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
+failed once intermittently during a full-suite run that took **68s against a normal ~32s**; it passes
+in isolation, and the full suite passed on re-run. Suspected **timeout flake** (the AppTest default
+timeout under a slow run), not an assertion failure. **Not caused by the pass it occurred in** (that
+pass changed documentation only — no code or test) and **not yet diagnosed**. If it recurs, capture
+the traceback and consider raising the AppTest `default_timeout`; do not weaken the test.
+
 ---
 
 ## Rejected approaches

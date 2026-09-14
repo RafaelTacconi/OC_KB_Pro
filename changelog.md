@@ -7,6 +7,40 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-14 — README rewrite around the service purpose; matrix A42–A54; flaky-test note
+
+Documentation-only. **No code and no test was touched.**
+
+- **README.md rewritten** for a first-time reader (colleague, reviewer, maintainer): what the tool
+  is, with refusal as a **headline property**; how it works in four plain steps, including the
+  explicit statement that **the model never sees the full document set**; scope — what OC_KB_Pro
+  owns vs what the calling task/workflow system owns, with the request/task diagram; honest current
+  status (PoC; Step 8 focused 15/15 vs mixed 14/15, a one-question difference on a 15-question set,
+  so not evidence that separation improves retrieval — the measured benefit is per-Workspace
+  instructions); a plain known-limitations list; the prominent launch warning (launching without the
+  venv active can make Streamlit re-exec to base Python, which lacks `sentence-transformers`, so
+  uploads fail silently while the UI looks fine); and a "where to look" map.
+- **ACCEPTANCE_MATRIX.md** retitled **A1–A54**; added §19/A42–A47 and §20/A48–A54 as
+  *specified, not built*.
+- **memory.md** — Codebase discovery: the flaky
+  `test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
+  (failed once under a 68s run vs a normal ~32s; passes in isolation; suspected timeout flake;
+  not diagnosed; not caused by its pass).
+
+**Schema and migration changes**
+- None.
+
+**Files modified**
+- `README.md`, `ACCEPTANCE_MATRIX.md`, `memory.md`, `changelog.md`, `state.md`. **No code or test
+  file was touched.**
+
+**Acceptance criteria**
+- No new criteria. A42–A54 remain *specified, not built*.
+
+**Tests:** `python -m pytest tests/ -q` → **79 passed**.
+
+---
+
 ## 2026-09-14 — Spec-only: activity logging (§19), service interface (§20), sequencing (§21), OPEN-15/16/17
 
 Owner-directed **specification pass. No application code and no test was touched.**
