@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-14 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN (results recorded); spec-only §19/§20/§21 added (nothing built); **README rewritten around the service purpose; matrix retitled A1–A54**; owner review pending.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; spec-only §19/§20/§21 + A42–A54 (nothing built); README rewritten; **first real-document validation done (A29 partially discharged); one real defect found in xlsx row counting — fix proposed, awaiting owner approval**.
 
 ---
 
@@ -12,7 +12,7 @@ steps an implementing agent can complete are done; what remains needs you.
 
 **Implemented and green (Steps 1–7 + SPEC §14/§15/§16 + §7.14/§18).** The full
 suite passes from a clean clone: `python -m pytest tests/ -q` → **79 passed**.
-Acceptance matrix for **A1–A41** is in `ACCEPTANCE_MATRIX.md`. Recent additions:
+Acceptance matrix for **A1–A54** is in `ACCEPTANCE_MATRIX.md`. Recent additions:
 §15 embedded-image visibility + no-model send block (A26–A28); the post-test
 fixes §7.10–§7.14 (A29–A32, A36, incl. shape-based headings and the new-chat
 selection fix); §16 message timestamps + Markdown chat export (A33–A34); §9.3
@@ -29,6 +29,16 @@ exists).
 **README.md** now explains the tool for a first-time reader: what it is (refusal
 is the point), how it works, its scope vs the calling system, honest status, known
 limitations, and the launch warning. `ACCEPTANCE_MATRIX.md` covers A1–A54.
+
+**First real-document validation (2026-09-15):** a real bank procedure — four
+documents (2 .docx with 23 tables/9 images, 1 .xlsx with 7 sheets, 1 .pdf), 19
+questions. A29's heading heuristic produced correct section titles in every
+citation (partial discharge of the caveat). Grounding held on all five
+adversarial-style questions. Three image-only questions were correctly refused.
+**One real defect found:** xlsx row counting is wrong when a sheet has a title
+block — the model stated "45 rows" for a 42-row sheet. Root cause investigated
+(`parsers.py::parse_xlsx`, `header=0`); **fix proposed, NOT built, owner approval
+pending** (see `memory.md`). An ingestion fix means re-processing xlsx Sources.
 
 **Step 8 focused-vs-mixed evaluation RAN (2026-09-13),** on the re-uploaded
 corpus (four Workspaces, all docs indexed). Top-5 hit rate (hybrid):
@@ -115,13 +125,14 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 | §20 — Service interface / API (A48–A54) | **Specified (2026-09-14), not built** |
 | §21 — Build sequencing (logging → API → dashboard) | **Recorded (2026-09-14); no criteria** |
 | §17 — Post-PoC direction (titles-only stub) | Documented, not built (by direction) |
+| xlsx row-count defect (ingestion) | **Found 2026-09-15 (real corpus); fix proposed, await approval** |
 | 8 — Evaluate (§9.3) | **RUN (2026-09-13) — results recorded; owner decision pending** |
 
 ## Test status
 
 ```
 python -m pytest tests/ -q
-79 passed   (2026-09-14, docs-only pass)
+79 passed   (2026-09-15, docs-only pass)
 ```
 Known flake (see memory.md): `test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
 failed once under a slow (68s) run, passes in isolation; suspected timeout, not
@@ -132,11 +143,16 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-For the owner: **read and correct `SPEC.md` §19 / §20 / §21** before any build.
-Nothing there is implemented. Once approved, the build order is fixed: **§19
-activity logging first** (a service must be measurable before it is exposed),
-then §20 API, then — much later and only after real log data exists — a
-monitoring dashboard. Independent remaining tasks unchanged: re-run the
-seven-case grounding regression set (`GROUNDING_REGRESSION.md`, needs a live
-endpoint) to confirm A37–A41; confirm context windows against the live endpoint
-(OPEN-2, now blocking §20); decide what the flat §3.2 result changes.
+**Approve or reject the proposed xlsx row-count fix** (cause and proposal in
+`memory.md`; the defect made the model state "45 rows" for a 42-row sheet). It is
+a change to `ingestion/parsers.py::parse_xlsx` and would require re-processing
+xlsx Sources — hence spec-first and awaiting your decision.
+
+Then, for the owner: **read and correct `SPEC.md` §19 / §20 / §21** before any
+build. Nothing there is implemented. Once approved, the build order is fixed:
+**§19 activity logging first** (a service must be measurable before it is
+exposed), then §20 API, then — much later and only after real log data exists — a
+monitoring dashboard. Independent remaining tasks unchanged: re-run the seven-case
+grounding regression set (`GROUNDING_REGRESSION.md`, needs a live endpoint) to
+confirm A37–A41; confirm context windows against the live endpoint (OPEN-2, now
+blocking §20); decide what the flat §3.2 result changes.

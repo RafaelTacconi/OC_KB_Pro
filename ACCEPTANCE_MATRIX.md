@@ -65,9 +65,11 @@ timeouts mid-stream) is unverified until a live `.env` endpoint exists.
 | A31 | Chips deduped by `(display_name, section_title)` | `tests/test_citations_timestamps_export.py::test_a31_chips_dedupe_by_name_and_section` | ✅ |
 | A32 | Answer renders on send (inline render; spinner becomes the answer) | `tests/test_citations_timestamps_export.py::test_a32_send_renders_answer` + code inspection of `_answer` (spinner inside the assistant bubble) | ✅ |
 
-**⚠ A29 caveat:** the shape heuristic is validated only against the synthetic
-corpus, **not against real back-office documents** (see `memory.md`). Re-check
-against the real corpus before citations are trusted.
+**⚠ A29 caveat (updated 2026-09-15):** validated against a real bank procedure on
+2026-09-15 — properly styled Word headings produced the correct section title in
+every citation, so the caveat is **partially discharged** for Word headings. It
+remains **unvalidated for PDFs with sentence-style or unnumbered headings** (see
+`memory.md`).
 
 ## Message timestamps and chat export (SPEC §16)
 

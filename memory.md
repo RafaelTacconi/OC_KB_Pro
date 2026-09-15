@@ -212,6 +212,20 @@ delete action (OPEN-6 / OPEN-8).
 Authority: Deferred — not reached.
 Consequence: No retention policy and no deletion are built.
 
+### Flaky test — `test_chat_error_handling.py` intermittent failure — 2026-09-15
+Question: Why did `tests/test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
+fail once during the §19/§20 pass, in a full-suite run that took 68s against a normal ~32s, while
+passing in isolation and on re-run?
+Outcome: Unresolved. Leading theory: an **`AppTest` timeout under load** — the test builds the real
+app with `AppTest.from_file(..., default_timeout=30)` and performs several `.run()` calls; under a
+slow run one can exceed 30s. It is **not waiting on anything external** (the model call is
+monkeypatched to raise, and the DB is a temp file), so if it is a timeout it is a machine-load /
+default-timeout artefact, not a dependency. Not reproduced since.
+Authority: Deferred — not reached.
+Consequence: The suite can report a spurious failure under load, and a real regression in the §7.1
+error path could be masked by assuming this test is flaky. **Do not weaken or skip the test.** If it
+recurs, capture the traceback and consider raising `default_timeout`.
+
 ---
 
 ## Codebase discoveries
@@ -470,6 +484,42 @@ in isolation, and the full suite passed on re-run. Suspected **timeout flake** (
 timeout under a slow run), not an assertion failure. **Not caused by the pass it occurred in** (that
 pass changed documentation only — no code or test) and **not yet diagnosed**. If it recurs, capture
 the traceback and consider raising the AppTest `default_timeout`; do not weaken the test.
+
+### 2026-09-15 — A29 heading heuristic validated against a real bank procedure (first real-document check)
+The shape-based `_looks_like_heading` rule (SPEC §7.10, A29) was validated against a **real bank
+procedure** for the first time (four documents — two .docx, one .xlsx, one .pdf — 19 questions).
+Properly styled Word headings (numbered, Heading 1/2/3) produced the **correct section title in
+every citation** — e.g. "3. The escalation rule", "5. Reading the scanned claim advice". The
+2026-09-13 caveat ("validated only against the synthetic corpus") is now **partially discharged: it
+holds for properly styled Word headings.** It remains unvalidated for **PDFs with sentence-style or
+unnumbered headings.**
+
+### 2026-09-15 — Measured image gap: real but narrower than assumed
+Real-corpus test (2026-09-15): two .docx held **9 embedded images**, two of them substantive (a full
+process-flow diagram and an annotated scanned document). Questions whose answers existed **only
+inside images** were correctly **refused** in all three cases tested. Questions whose answers were
+duplicated in text or in the companion .xlsx were answered correctly. Conclusion: the image gap is
+**real but narrower than assumed**, because well-written procedures tend to repeat diagram content in
+prose. **§17 F8 stays deferred; this measurement does not reopen it.**
+
+### 2026-09-15 — xlsx row counting is wrong when a sheet has a title block (real-corpus defect; fix proposed, not built)
+`ingestion/parsers.py::parse_xlsx` reads every sheet with `pd.read_excel(..., sheet_name=None)` at
+the **default `header=0`**, so it blindly treats **physical row 1** as the column header. A sheet
+with a title/subtitle block above the real header is misread: the title becomes the column names, and
+the real header and subtitle become ordinary data rows. The auto-summary
+`Sheet '…' has {df.shape[0]} rows` is then `physical_rows − 1`, **not** the true data-row count.
+Verified on a synthetic sheet (1 title + 1 subtitle + 1 header + 42 data = 45 physical rows): the
+summary said **"has 44 rows"**, the markdown table carried 44 data lines (plus a markdown header +
+separator = 46 `|` lines), and the true answer (42) appeared only incidentally inside a title cell
+now rendered as data. There is **no row-number prefix** (`index=False`) and **no marker for the real
+header**. The model answered **"45 rows"** — a confidently wrong count, exactly the failure the tool
+must not produce. Also note `chunk_text` splits the 24-token summary from the 542-token table into
+**separate chunks**, so a count in the summary is not guaranteed to travel with the table.
+**Proposed fix (NOT built; owner approval pending):** read with `header=None`, locate the real header
+as the first row matching the sheet's maximum non-empty-cell width (skipping a narrower title block),
+count only rows after it, and render an explicit 1-based row-number column so the last number is the
+count and line-count inference is impossible. An ingestion change here requires **re-processing every
+xlsx Source** (docx/pdf unaffected).
 
 ---
 

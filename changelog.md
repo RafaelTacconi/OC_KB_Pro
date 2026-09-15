@@ -7,6 +7,45 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Real-document validation recorded; xlsx row-count defect investigated (no code change)
+
+Documentation only. **No code and no test was touched.**
+
+- **Job 1 — xlsx row counting (investigation only; fix NOT built).** Root cause found:
+  `ingestion/parsers.py::parse_xlsx` uses `pd.read_excel` at the default `header=0`, so a title block
+  above the real header is misread and the auto-summary count becomes `physical_rows − 1`; the
+  rendered table adds a markdown header + separator and has no row-number prefix, so several wrong
+  counts are available and the true count can be absent. Verified on a synthetic 45-physical-row
+  sheet. Full detail and the proposed fix (owner approval pending) are in `memory.md`. An ingestion
+  fix here requires **re-processing xlsx Sources**.
+- **Job 2 — first real-document validation.** Four documents (two .docx with 23 tables and 9 embedded
+  images, one .xlsx with 7 sheets, one .pdf), 19 questions. A29's heading heuristic produced correct
+  section titles in every citation on properly styled Word headings — partially discharging the
+  2026-09-13 caveat. The image gap was measured: three image-only questions were correctly refused;
+  the gap is real but narrower than assumed. Both recorded in `memory.md`. §17 F8 stays deferred.
+- **Job 3 — intermittent test** recorded in `memory.md` as an open reliability question
+  (Authority: *Deferred — not reached*) with an `AppTest` 30s-timeout-under-load theory.
+- **ACCEPTANCE_MATRIX.md** — already retitled **A1–A54** with A42–A54 in the previous docs commit
+  (`2e2d96e`); re-verified, no change this pass. Its A29 caveat was updated to record the partial
+  validation.
+
+**Schema and migration changes**
+- None.
+
+**Files modified**
+- `memory.md`, `changelog.md`, `state.md`, `ACCEPTANCE_MATRIX.md`. **No code or test file was touched.**
+
+**Acceptance criteria**
+- None changed. A29 note updated (partially discharged); A42–A54 remain *specified, not built*.
+
+**Known-broken / deferred**
+- xlsx row counting is a confirmed real defect; fix proposed, awaiting approval.
+- Flaky `test_chat_error_handling.py` remains undiagnosed.
+
+**Tests:** `python -m pytest tests/ -q` → **79 passed**.
+
+---
+
 ## 2026-09-14 — README rewrite around the service purpose; matrix A42–A54; flaky-test note
 
 Documentation-only. **No code and no test was touched.**
