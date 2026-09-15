@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); a prompt-level over-refusal defect (wrong refusal on a chunk that provably held the answer) recorded in `memory.md` — mechanism demonstrated, frequency unmeasured, no fix approved**.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); positive set run 15 bare questions → 14 correct / 1 refusal, so the earlier over-refusal entry is CORRECTED to 1/15 (an OPEN JUDGEMENT CALL, not a proven defect); PDF section titles confirmed misleading in citations; two earlier suspicions withdrawn; no fix approved**.
 
 ---
 
@@ -140,19 +140,19 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Decide how to address over-refusal.** The 2026-09-15 NBCA run recorded a
-**positive-case failure** in `memory.md`: a wrong refusal ("The documents do not
-cover…") on a question whose answer was **provably in the rank-1 retrieved
-chunk** — ruled out as retrieval, chunking and ingestion failure, so it is
-**prompt-level**, the same layer as the seven §18 grounding failures. The
-mechanism is demonstrated; the **frequency is unmeasured**. **Deciding a fix
-requires first building a positive-case regression set** (questions whose answers
-are known to be in the corpus — the mirror of `GROUNDING_REGRESSION.md`, which
-does not exist yet). **No fix is approved and none should be proposed until that
-set exists; do not change retrieval settings or prompts.** The OPEN-16 re-run at
-scale (measure both correct-chunk rank and distinct-document count) remains
-outstanding — the NBCA 2/2/2 result **contradicts** the AML 2/2/3 widening, which
-is exactly why measurement at scale is needed; **OPEN-16 is still unanswered.**
+**Decide two things. (1) PC-01 — defect or correct strictness?** The positive set ran
+2026-09-15 (15 bare questions via `scripts/run_question_set.py`; see `memory.md`): **14 correct,
+1 refusal** (PC-01), so the earlier over-refusal entry is **corrected — the rate is 1/15, not a
+general tendency**. PC-01 reproduces with the answer-bearing chunks retrieved, but the
+destination appears only **incidentally** (a subordinate clause + a glossary definition) while
+all 14 passes state a declarative fact — so the refusal **may be intended §18 strictness**: an
+**OPEN JUDGEMENT CALL, not a proven defect**. Decide whether it is a defect or correct
+strictness. **(2) PDF section titles** are confirmed misleading in citations (run-on body text and
+page furniture used as `section_title`); decide whether that warrants an **ingestion fix** (bears
+on A29's PDF caveat; A29 status unchanged). **No fix is approved; do not change retrieval
+settings or prompts or `SPEC.md`.** The OPEN-16 re-run at scale (measure both correct-chunk rank
+and distinct-document count) remains outstanding; **OPEN-16 is still unanswered.** (Two earlier
+suspicions — short-chunk loss and the PDF never retrieving — are **withdrawn**; see `memory.md`.)
 
 Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
 was built; correct anything you disagree with. **The xlsx row-count fix stays

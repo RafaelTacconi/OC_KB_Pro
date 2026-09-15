@@ -744,6 +744,52 @@ words**, indicating a **mangled parse**. This **may** contribute to the PDF neve
 retrieved in ~40 observed source slots. **Untested — do not investigate and do not tune
 anything.**
 
+### 2026-09-15 — Positive set run: 15 bare questions → 14 correct, 1 refusal; earlier over-refusal conclusion CORRECTED; two suspicions WITHDRAWN
+`GROUNDING_REGRESSION_POSITIVE.md` (off-repo) run **bare** via `scripts/run_question_set.py`
+against workspace `d93d5cd12269400e9298c535062afc65`, staging API, **2026-09-15**: **15 questions,
+14 answered correctly** against the expected answers, **1 refusal**.
+
+**CORRECTION to the entry "DEFECT: over-refusal on retrieved material" (2026-09-15).** That
+entry was written from **ONE observation** and implied a general tendency; on 15 verified
+positive cases the rate is **1/15**, not a general tendency. The original entry is **left
+unedited** — this entry corrects and cross-references it.
+
+**PC-01 reproduced — a borderline case, recorded as an OPEN JUDGEMENT CALL (not a proven
+defect).** "Where do escalated breaks go and who receives them?" refused again, with the same
+answer-bearing chunks retrieved (SOP section "1. What this process is and why it exists" +
+"Glossary"). **Reproducible, not noise.** Nuance: in the corpus the escalation pack's destination
+appears only **INCIDENTALLY** — a subordinate clause about an 11:00 deadline, plus a glossary
+definition; all **14 passing cases state their answer as a declarative fact**. The refusal **may**
+be the model distinguishing "mentioned in passing" from "specified", which is close to **intended
+§18 behaviour**. Same routing weakness in the SOP that produced the earlier "three destinations,
+names two" finding. **Open judgement call — decide defect vs correct strictness; no fix.**
+
+**Two recorded suspicions REFUTED — WITHDRAWN explicitly (do not re-litigate):**
+1. "SOP 'Key contacts' chunk `3d03f4c1…` never retrieved / short chunks may lose on length" —
+   **REFUTED**: it was retrieved at **RANK 1 on two questions** in this run. The short-chunk
+   suspicion is **withdrawn**; it rested on too few questions.
+2. "The PDF has never been retrieved in ~40 slots" — **REFUTED**: the PDF appeared in **5 of 15**
+   questions. **Withdrawn** as a sampling artefact.
+
+**PDF section titles — CONFIRMED USER-VISIBLE.** Across multiple retrieved PDF sources, observed
+`section_title` values include **run-on body text and page furniture** — e.g. a title beginning
+"6 Apply the escalation rule", and another consisting of the document's owner/version/side
+footer. These strings are what the **citation chips display**: **answers correct, citations
+misleading.** Bears on **A29's PDF caveat** (now with evidence against it). **A29's status is
+unchanged; `SPEC.md` is not edited; no criterion is added.**
+
+**Metric evidence (Tier 1 under-count, §19.6):** all **15 returned NON-EMPTY sources**, so the
+run logs **15 answered / 0 refused** by the Tier 1 signal **despite one actual refusal** — a live
+demonstration of the documented under-count.
+
+**Also recorded:**
+- The **mojibake** in the results file (accented names, em dashes) came from a **PowerShell
+  `Out-File` redirect, NOT the database** — earlier terminal output rendered the same strings
+  correctly. **No data issue; do not chase it.**
+- **PC-14** (SOP owner/version/date) passed from the **document title-block chunk**. It is a
+  **weak case** — title-block chunks rank highly for almost any question, so it can barely fail.
+  **Low-value evidence.**
+
 ---
 
 ## Rejected approaches

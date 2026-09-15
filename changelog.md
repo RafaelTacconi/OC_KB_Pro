@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Docs: positive-set run recorded (15 bare questions → 14 correct / 1 refusal; over-refusal entry CORRECTED to 1/15; two suspicions withdrawn; PDF section titles confirmed misleading; no code change)
+
+---
+
 ## 2026-09-15 — Measurement tool: `scripts/run_question_set.py` (bare-question runner; no retrieval/prompt change)
 
 New measurement script, companion to `scripts/measure_open16.py` (same category: not a test, not
