@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A62)**; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction.
 
 ---
 
@@ -12,7 +12,7 @@ steps an implementing agent can complete are done; what remains needs you.
 
 **Implemented and green (Steps 1–7 + SPEC §14/§15/§16 + §7.14/§18 + §19.6/§20.9–§20.13).** The full
 suite passes from a clean clone: `python -m pytest tests/ -q` → **93 passed**. Acceptance matrix for
-**A1–A54** is in `ACCEPTANCE_MATRIX.md` (A55–A62 not yet added there). Recent additions: §15
+**A1–A63** is in `ACCEPTANCE_MATRIX.md`. Recent additions: §15
 embedded-image visibility + no-model send block (A26–A28); the post-test fixes §7.10–§7.14
 (A29–A32, A36); §16 message timestamps + Markdown chat export (A33–A34); §9.3 second CLI argument
 (A35); §18 grounding rules (A37–A41); **§19.6 Tier 1 logging (A55); §20.9–§20.13 localhost-only
@@ -25,8 +25,7 @@ rate limiting, per-caller identity, production auth. See `memory.md`.
 
 **Still specified-only:** the production §20 surface (A48–A54), the monitoring dashboard (§21).
 
-**README.md** explains the tool for a first-time reader. `ACCEPTANCE_MATRIX.md` covers A1–A54 (the
-new A55–A62 are not yet added there).
+**README.md** explains the tool for a first-time reader. `ACCEPTANCE_MATRIX.md` covers A1–A63.
 
 **First real-document validation (2026-09-15):** a real bank procedure — four
 documents (2 .docx with 23 tables/9 images, 1 .xlsx with 7 sheets, 1 .pdf), 19
@@ -130,7 +129,7 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 
 ```
 python -m pytest tests/ -q
-93 passed   (2026-09-15)
+94 passed   (2026-09-15)
 ```
 Known flake (see memory.md): `test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
 failed once under a slow (68s) run, passes in isolation; suspected timeout, not

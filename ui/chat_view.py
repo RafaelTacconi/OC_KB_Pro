@@ -309,7 +309,10 @@ def _run_turn(
         model_slug=provider_model_name(model_id),
         retrieval_ms=retrieval_ms,
         total_ms=(time.perf_counter() - started) * 1000.0,
-        outcome="answered",
+        # SPEC §19.6: the empty-retrieval refusal signal is applied IDENTICALLY
+        # on the UI and the API, so the two are comparable. LOGGING ONLY — the
+        # UI still calls the model on an empty chunk set (no short-circuit).
+        outcome="refused" if not chunks else "answered",
     )
     return degraded, answer_text, cited_sources
 

@@ -68,3 +68,51 @@ def test_refusal_rate_computable_from_tier1(tmp_path):
     assert rr["error"] == 1
     assert rr["total"] == 3
     assert rr["refusal_rate"] == pytest.approx(1 / 3)
+
+
+def test_zero_chunk_ui_turn_logs_refused(monkeypatch, tmp_path):
+    """SPEC §19.6 / A63: the empty-retrieval refusal signal is applied the SAME
+    on the UI as on the API. The UI still calls the model (no short-circuit)."""
+    monkeypatch.chdir(tmp_path)
+    from db import init_db, transaction
+
+    init_db()
+    with transaction() as conn:
+        conn.execute("INSERT INTO users (user_id, display_name, role) VALUES ('u1', 'U', 'member')")
+        conn.execute(
+            "INSERT INTO workspaces (workspace_id, name, owner_user_id, instructions, created_at, updated_at) "
+            "VALUES ('w', 'W', 'u1', '', 'now', 'now')"
+        )
+        conn.execute(
+            "INSERT INTO chats (chat_id, workspace_id, user_id, title, created_at, updated_at) "
+            "VALUES ('c1', 'w', 'u1', 't', 'now', 'now')"
+        )
+
+    import ui.chat_view as cv
+
+    calls = {"model": 0}
+
+    def fake_model(prompt, model_id):
+        calls["model"] += 1
+        return "an answer"
+
+    monkeypatch.setattr(cv, "hybrid_search", lambda *a, **k: ([], False))
+    monkeypatch.setattr(cv, "call_model", fake_model)
+
+    degraded, answer, cited = cv._run_turn("w", "u1", "c1", "a question", "internal-standard")
+
+    # No short-circuit: the model WAS still called, exactly as before.
+    assert calls["model"] == 1
+    assert answer == "an answer"
+    assert cited == []
+
+    conn = get_log_connection()  # tmp_path/data/logs.db
+    try:
+        rows = [dict(r) for r in conn.execute("SELECT * FROM tier1_turn_log")]
+    finally:
+        conn.close()
+    assert len(rows) == 1
+    assert rows[0]["source"] == "ui"
+    assert rows[0]["outcome"] == "refused"
+    assert rows[0]["chunks_retrieved"] == 0
+

@@ -7,6 +7,43 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Corrections: UI refusal signal, 413 code, OPEN-2 staging deviation (A63)
+
+Four corrections to the staging slice built in `174fb95`. Spec first where logging/contract changed;
+no renumbering.
+
+- **UI refusal logging fixed (§19.6, A63).** `ui/chat_view.py::_run_turn` logged `answered` on every
+  success, so the UI — nearly all traffic — reported a **0% refusal rate**. It now logs `refused` iff
+  `chunks_retrieved == 0`, the same rule as `service/engine.py`. **The UI still calls the model on
+  zero chunks — no short-circuit was added** (owner direction). New test
+  `test_zero_chunk_ui_turn_logs_refused` asserts the `refused` row *and* that the model was called.
+- **413 error code fixed.** `service/api.py` returned `invalid_request` with HTTP 413; it now returns
+  **`request_too_large`** per §20.6/§20.12. The test assertion was corrected.
+- **Refusal signal scope recorded (§19.6 + `memory.md`).** The interim signal means **empty retrieval
+  only** and **under-counts** refusals (chunks retrieved but not answering log `answered`).
+  Authority: answered by project owner on 2026-09-15 (scope of the interim signal only; OPEN-15
+  remains open). Not extended.
+- **OPEN-2 staging deviation named (§20.9 + `memory.md`).** The staging API is built on the
+  unconfirmed 256,000-token assumption; the 256 KiB body cap is unrelated, and a request under it can
+  still exceed the provider's real limit → `502 provider_error`, most likely during the OPEN-16
+  measurement. OPEN-2 is not answered.
+- **Smaller fixes:** `X-API-Key` named explicitly in §20.11; the `top_k=5` duplication and the
+  `chunks`-has-no-page finding recorded in `memory.md`; `state.md` corrected (matrix is A1–A63).
+
+**Schema and migration changes**
+- None.
+
+**Files modified**
+- `ui/chat_view.py`, `service/api.py`, `tests/test_api_staging.py`, `tests/test_activity_log.py`,
+  `SPEC.md`, `ACCEPTANCE_MATRIX.md`, `memory.md`, `state.md`, `changelog.md`.
+
+**Acceptance criteria**
+- A63 added and green; A61 now genuinely green (413 code corrected).
+
+**Tests:** 93 → **94 passed**.
+
+---
+
 ## 2026-09-15 — Tier 1 logging + staging service API (SPEC §19.6, §20.9-§20.13; A55-A62)
 
 Built the first slice of §19/§20: **Tier 1 logging** and a **localhost-only staging API**. Spec

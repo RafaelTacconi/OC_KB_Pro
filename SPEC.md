@@ -683,6 +683,7 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A60. When retrieval finds nothing, the API returns the documented refusal with `sources: []` and does not fabricate content.
 - A61. The API returns distinct documented errors — machine-readable codes, no stack traces — for unknown workspace, bad/missing key, no model configured, provider failure, oversized request, and malformed request.
 - A62. Rate limiting is deliberately absent in staging (one localhost caller); A54 remains the production requirement. Per-caller identity/membership mapping and Tier 2 logging are likewise not built.
+- A63. The empty-retrieval refusal signal is applied identically on the UI and the API: a completed UI turn with zero retrieved chunks logs `outcome='refused'` while still calling the model (no short-circuit added to the UI), matching the API. The signal is documented as under-counting refusals (chunks retrieved but not answering are logged `answered`) until OPEN-15 is answered (SPEC §19.6).
 
 ---
 
@@ -1268,16 +1269,21 @@ time:
 - **A logging failure never fails a question:** `log_turn()` swallows its own
   exceptions. A question with no log row is acceptable; a failed question because
   logging failed is not.
-- **`refused` population is deferred to OPEN-15.** The application cannot observe
-  groundedness (§19.3). Tier 1 records `outcome='answered'` on a completed turn
-  and `outcome='error'` on a failure. The one refusal the application *can*
-  observe is an **empty retrieval** (`chunks_retrieved = 0`), which the API
-  short-circuits to the documented refusal (§20.5) and logs as
-  `outcome='refused'`. The wider refusal rate — chunks retrieved but not
-  answering — needs the signal OPEN-15 has not decided. **Recorded, not
-  resolved.**
+- **The empty-retrieval refusal signal is applied IDENTICALLY on both surfaces
+  (fixed 2026-09-15).** The application cannot observe groundedness (§19.3). On a
+  completed turn `outcome` is `refused` **iff `chunks_retrieved = 0`**, otherwise
+  `answered`; on a failure it is `error` — **the same rule in the UI and the API**,
+  so the two are comparable. The API additionally short-circuits to the documented
+  refusal on zero chunks (§20.5); **the UI does not** and still calls the model
+  exactly as before. The *log value* is identical; the *behaviour* is unchanged.
+- **This signal UNDER-COUNTS refusals.** A turn where chunks came back but the
+  documents did not answer is logged `answered`, not `refused`. The wider signal
+  is exactly OPEN-15 and is **not decided here**. **Authority: answered by project
+  owner on 2026-09-15 (the scope of the interim signal only; OPEN-15 itself
+  remains open).** This interim scope stands until OPEN-15 is answered by the
+  owner.
 
-**Acceptance criteria:** A42–A47 (§10).
+**Acceptance criteria:** A42–A47, A63 (§10).
 
 ---
 
@@ -1445,6 +1451,14 @@ and is superseded before production.**
 - API calls are **not** persisted as Chats or Messages (§20.8).
 - The API reads the existing main database for Workspace instructions and chunks;
   it writes only to the log database (§19).
+- **Named staging deviation from OPEN-2:** the staging API is built on the
+  **unconfirmed 256,000-token context-window assumption**. The 256 KiB
+  request-body cap (§20.12) is a flat size guard, **unrelated** to the model's
+  real context limit — a request under 256 KiB can still exceed the provider's
+  real limit and surface as a `502 provider_error`. This is **most likely to bite
+  during the OPEN-16 measurement** (§11), where long case context is the point.
+  OPEN-2 is **not answered here**; the real windows must be confirmed against the
+  live endpoint before production.
 
 ### 20.10 Binding — the OPEN-14 containment `[NEW]`
 
@@ -1462,8 +1476,8 @@ negotiable.**
 
 ### 20.11 Authentication — deliberately minimal and temporary `[NEW]`
 
-- A **single static key** `KB_API_KEY` (from `.env`, §14.2) is sent in a request
-  header.
+- A **single static key** `KB_API_KEY` (from `.env`, §14.2) is sent in the
+  **`X-API-Key`** request header.
 - A missing or wrong key returns the documented `401`, produces **no answer**,
   and **still writes a Tier 1 row** (outcome `error`, `error_type` =
   `unauthenticated`).

@@ -1,8 +1,8 @@
-# Acceptance matrix — A1–A62
+# Acceptance matrix — A1–A63
 
 Verified 2026-09-15 against current `main`. Method: each criterion is mapped to
 the test(s) or code that prove it, or is marked *not verifiable* / *specified, not
-built* with the reason. The full suite (**93 passed**) runs from a clean clone:
+built* with the reason. The full suite (**94 passed**) runs from a clean clone:
 `git clone` → fresh venv → `pip install -r requirements.txt` →
 `python -m pytest tests/ -q`.
 
@@ -144,6 +144,7 @@ behaviour in `SPEC.md` §20.
 | A60 | Empty retrieval → documented refusal + `sources: []`, no fabrication | `service/engine.py` (`REFUSAL_TEXT`, zero-chunk branch) + `outcome='refused'` logged | ✅ |
 | A61 | Documented errors (unknown workspace, bad/missing key, no model, provider failure, oversized, malformed); no stack traces | `service/api.py::process_request`; `tests/test_api_staging.py` (413/400/404/503/401); live smoke: 401/404/503 | ✅ |
 | A62 | Rate limiting deliberately absent in staging; no per-caller identity; no Tier 2 | `SPEC.md` §20.13; no such code | ✅ (by absence) |
+| A63 | Empty-retrieval refusal signal applied identically on UI and API (UI logs `refused` on zero chunks while still calling the model); under-count documented | `tests/test_activity_log.py::test_zero_chunk_ui_turn_logs_refused`; `ui/chat_view.py::_run_turn`; `service/engine.py`; `SPEC.md` §19.6 | ✅ |
 
 ## Not verifiable without owner inputs
 

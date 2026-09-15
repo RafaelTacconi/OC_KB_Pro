@@ -261,6 +261,33 @@ OPEN-13/OPEN-14, and `KB_API_KEY` must be replaced by §17 F10's identity model.
 computable for the API's empty-retrieval case (`outcome='refused'`); the wider refusal signal is
 still OPEN-15 (SPEC §19.6).
 
+### Interim refusal signal — scope fixed 2026-09-15
+Question: Which refusal signal should Tier 1 record?
+Outcome: **Interim, owner-scoped, and applied identically on both surfaces.** On a completed turn
+`outcome='refused'` iff `chunks_retrieved == 0`, else `answered`; failures are `error`. **UI fix:**
+`ui/chat_view.py::_run_turn` previously logged `answered` on every success, so the UI — nearly all
+traffic — reported a **0% refusal rate**; it now applies the same rule as the API. The UI still
+**calls the model on zero chunks**; no short-circuit was added (owner: do not add one). **This signal
+UNDER-COUNTS refusals:** a turn where chunks came back but the documents did not answer logs
+`answered`. That wider question is OPEN-15 and is deliberately not answered here.
+Authority: Answered by project owner on 2026-09-15 (the scope of the interim signal only; OPEN-15
+itself remains open).
+Consequence: The refusal rate is usable and comparable across UI and API, but is a **floor**, not the
+full rate, until OPEN-15 is answered by the owner.
+
+### OPEN-2 staging deviation — named 2026-09-15
+Question: SPEC §11 OPEN-2 requires the real `context_window_tokens` to be confirmed against the live
+endpoint before the API is built. It was not.
+Outcome: **Named staging deviation; not an answer.** The staging API was built on the unconfirmed
+256,000-token assumption. The 256 KiB request-body cap (SPEC §20.12) is a **flat size guard,
+unrelated** to the model's real context limit: a request under 256 KiB can still exceed the
+provider's real limit and surface as a `502 provider_error` — **most likely during the OPEN-16
+measurement**, where long case context is the point.
+Authority: Deferred — not reached (OPEN-2 remains open; this records the deviation, it does not
+answer OPEN-2).
+Consequence: A staging API request with large case context may fail as 502 for a reason that is
+really an unconfirmed context window. Confirm against the live endpoint before production.
+
 ---
 
 ## Codebase discoveries
@@ -565,6 +592,21 @@ engine has its own small orchestration. (2) `_load_workspace()` exists only insi
 `ui/chat_view.py`; the engine keeps its own 5-line read rather than importing `ui` (which would pull
 Streamlit into the API process). Nothing needed a workaround; if a third caller appears, those two
 reads should move to a non-UI module.
+
+### 2026-09-15 — `top_k=5` now lives in two surfaces and can silently drift
+`top_k=5` is hardcoded in **both** `ui/chat_view.py::_run_turn` and
+`service/engine.py::answer_question`. The two surfaces now carry the same retrieval constant in two
+places; changing one and not the other would make the UI and the API retrieve different numbers of
+chunks with no test catching it. **Note, not a refactor** (owner direction): do not move it yet. If a
+third caller appears, or when the OPEN-16 measurement suggests a change, centralise it.
+
+### 2026-09-15 — the `chunks` table stores nothing page-like (the API `page` field is an INGESTION gap)
+The `chunks` table has **no page column**: `chunk_id, source_id, workspace_id, section_title, text,
+embedding_text, embedding, token_count, created_at`. The PDF fallback parser sets
+`section_title = "Page N"`, but the primary `unstructured` path uses real headings and discards the
+page. So the API's always-null `page` (SPEC §20.13) is an **ingestion gap, not a rendering gap** —
+populating it would require capturing and storing a page number during parsing, i.e. an ingestion
+change and a corpus re-processing.
 
 ---
 

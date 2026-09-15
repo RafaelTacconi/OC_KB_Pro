@@ -140,8 +140,8 @@ def process_request(
     started = time.perf_counter()
 
     if content_length is not None and content_length > MAX_REQUEST_BYTES:
-        _log_api(None, 0, 0, "error", "invalid_request", started)
-        return 413, _error("invalid_request", "Request body exceeds the accepted size.")
+        _log_api(None, 0, 0, "error", "request_too_large", started)
+        return 413, _error("request_too_large", "Request body exceeds the accepted size.")
 
     if not expected_key or (api_key_header or "") != expected_key:
         _log_api(None, 0, 0, "error", "unauthenticated", started)

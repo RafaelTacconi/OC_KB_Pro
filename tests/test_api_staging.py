@@ -76,7 +76,7 @@ def test_oversized_request_413(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     status, body = api.process_request(b"", api.MAX_REQUEST_BYTES + 1, "secret", "secret")
     assert status == 413
-    assert body["error"]["code"] == "invalid_request"
+    assert body["error"]["code"] == "request_too_large"
 
 
 def test_malformed_json_400(monkeypatch, tmp_path):
