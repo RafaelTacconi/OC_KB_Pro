@@ -4,31 +4,29 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; spec-only §19/§20/§21 + A42–A54 (nothing built); README rewritten; **first real-document validation done (A29 partially discharged); one real defect found in xlsx row counting — fix proposed, awaiting owner approval**.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A62)**; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction.
 
 ---
 
 ## Where the project stands
 
-**Implemented and green (Steps 1–7 + SPEC §14/§15/§16 + §7.14/§18).** The full
-suite passes from a clean clone: `python -m pytest tests/ -q` → **79 passed**.
-Acceptance matrix for **A1–A54** is in `ACCEPTANCE_MATRIX.md`. Recent additions:
-§15 embedded-image visibility + no-model send block (A26–A28); the post-test
-fixes §7.10–§7.14 (A29–A32, A36, incl. shape-based headings and the new-chat
-selection fix); §16 message timestamps + Markdown chat export (A33–A34); §9.3
-second CLI argument (A35); §18 grounding rules in `SYSTEM_POLICY` (A37–A41,
-prompt-level only, hand-verified via `GROUNDING_REGRESSION.md`). §17 is a
-titles-only stub for post-PoC direction (F1–F11).
+**Implemented and green (Steps 1–7 + SPEC §14/§15/§16 + §7.14/§18 + §19.6/§20.9–§20.13).** The full
+suite passes from a clean clone: `python -m pytest tests/ -q` → **93 passed**. Acceptance matrix for
+**A1–A54** is in `ACCEPTANCE_MATRIX.md` (A55–A62 not yet added there). Recent additions: §15
+embedded-image visibility + no-model send block (A26–A28); the post-test fixes §7.10–§7.14
+(A29–A32, A36); §16 message timestamps + Markdown chat export (A33–A34); §9.3 second CLI argument
+(A35); §18 grounding rules (A37–A41); **§19.6 Tier 1 logging (A55); §20.9–§20.13 localhost-only
+staging API (A56–A62)**. §17 is a titles-only stub (F1–F11).
 
-**Newly specified, NOT built (spec-only pass 2026-09-14):** §19 Activity logging
-(F4), §20 Service interface / API (F7), §21 build sequencing, and criteria
-A42–A54. Review these in `SPEC.md` before any implementation. The chosen order is
-§19 first, §20 second, monitoring dashboard last (unspecified until real log data
-exists).
+**Newly built, staging scope only (2026-09-15):** **Tier 1 logging** (`activity_log.py`, separate
+`data/logs.db`, WAL + `busy_timeout`; main DB unchanged) and the **staging API** (`service/`, reuse
+of `retrieval/`/`prompting/`/`models/`, loopback-only, static `KB_API_KEY`). **Not built:** Tier 2,
+rate limiting, per-caller identity, production auth. See `memory.md`.
 
-**README.md** now explains the tool for a first-time reader: what it is (refusal
-is the point), how it works, its scope vs the calling system, honest status, known
-limitations, and the launch warning. `ACCEPTANCE_MATRIX.md` covers A1–A54.
+**Still specified-only:** the production §20 surface (A48–A54), the monitoring dashboard (§21).
+
+**README.md** explains the tool for a first-time reader. `ACCEPTANCE_MATRIX.md` covers A1–A54 (the
+new A55–A62 are not yet added there).
 
 **First real-document validation (2026-09-15):** a real bank procedure — four
 documents (2 .docx with 23 tables/9 images, 1 .xlsx with 7 sheets, 1 .pdf), 19
@@ -121,18 +119,18 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 | §16 — Message timestamps + Markdown chat export | Done |
 | §7.14 — New-chat selection after first question (A36) | Done |
 | §18 — Grounding rules in the system prompt (A37–A41) | Done (prompt-level only; hand-verified) |
-| §19 — Activity logging (A42–A47) | **Specified (2026-09-14), not built** |
-| §20 — Service interface / API (A48–A54) | **Specified (2026-09-14), not built** |
+| §19 — Tier 1 activity logging (A42–A47, A55) | **Tier 1 BUILT (2026-09-15); Tier 2 not built** |
+| §20 — Service interface / API | **Staging subset BUILT, localhost-only (A56–A62); production surface (A48–A54) not built** |
 | §21 — Build sequencing (logging → API → dashboard) | **Recorded (2026-09-14); no criteria** |
 | §17 — Post-PoC direction (titles-only stub) | Documented, not built (by direction) |
-| xlsx row-count defect (ingestion) | **Found 2026-09-15 (real corpus); fix proposed, await approval** |
+| xlsx row-count defect (ingestion) | **Deferred by direction 2026-09-15 (build not approved)** |
 | 8 — Evaluate (§9.3) | **RUN (2026-09-13) — results recorded; owner decision pending** |
 
 ## Test status
 
 ```
 python -m pytest tests/ -q
-79 passed   (2026-09-15, docs-only pass)
+93 passed   (2026-09-15)
 ```
 Known flake (see memory.md): `test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
 failed once under a slow (68s) run, passes in isolation; suspected timeout, not
@@ -143,16 +141,18 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Approve or reject the proposed xlsx row-count fix** (cause and proposal in
-`memory.md`; the defect made the model state "45 rows" for a 42-row sheet). It is
-a change to `ingestion/parsers.py::parse_xlsx` and would require re-processing
-xlsx Sources — hence spec-first and awaiting your decision.
+**Try the staging API end to end on your machine** (needs a live `.env` model
+endpoint): add `KB_API_KEY` to `.env`, then
+`python -m service.api` (terminal, venv active), then from a second terminal
+`python scripts/measure_open16.py <workspace_id> "your question"` to run the
+OPEN-16 three-way retrieval measurement. The API is loopback-only by construction
+and refuses to start otherwise; 401/404/503 paths are verified, the **success path
+needs your live endpoint** and has not been run here.
 
-Then, for the owner: **read and correct `SPEC.md` §19 / §20 / §21** before any
-build. Nothing there is implemented. Once approved, the build order is fixed:
-**§19 activity logging first** (a service must be measurable before it is
-exposed), then §20 API, then — much later and only after real log data exists — a
-monitoring dashboard. Independent remaining tasks unchanged: re-run the seven-case
-grounding regression set (`GROUNDING_REGRESSION.md`, needs a live endpoint) to
-confirm A37–A41; confirm context windows against the live endpoint (OPEN-2, now
-blocking §20); decide what the flat §3.2 result changes.
+Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
+was built; correct anything you disagree with. **The xlsx row-count fix stays
+parked** until it can travel with other ingestion work (owner direction
+2026-09-15; see `memory.md`). Independent remaining tasks unchanged: re-run the
+seven-case grounding regression set (`GROUNDING_REGRESSION.md`, live endpoint) to
+confirm A37–A41; confirm context windows against the live endpoint (OPEN-2);
+decide what the flat §3.2 result changes.

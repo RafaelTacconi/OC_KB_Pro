@@ -1,11 +1,10 @@
-# Acceptance matrix — A1–A54
+# Acceptance matrix — A1–A62
 
-Verified 2026-09-14 against current `main` (Steps 1–7 complete, §14/§15/§16 work;
-Step 8 run; §7.14/A36, §18/A37–A41, and the spec-only §19/A42–A47 and §20/A48–A54
-passes). Method: each criterion is mapped to the test(s) that prove it, or is
-marked *not verifiable* / *specified, not built* with the reason. The full suite
-(**79 passed**) runs from a clean clone: `git clone` → fresh venv →
-`pip install -r requirements.txt` → `python -m pytest tests/ -q`.
+Verified 2026-09-15 against current `main`. Method: each criterion is mapped to
+the test(s) or code that prove it, or is marked *not verifiable* / *specified, not
+built* with the reason. The full suite (**93 passed**) runs from a clean clone:
+`git clone` → fresh venv → `pip install -r requirements.txt` →
+`python -m pytest tests/ -q`.
 
 ## Multi-Workspace (SPEC §5)
 
@@ -132,6 +131,19 @@ behaviour in `SPEC.md` §20.
 | A52 | Empty retrieval → documented refusal + `sources: []`, nothing fabricated | `SPEC.md` §20.5 | *specified, not built* |
 | A53 | Distinct documented status/code for bad Workspace, unknown caller, provider failure, oversized request, no model, malformed request; no stack traces | `SPEC.md` §20.6 | *specified, not built* |
 | A54 | Rate limiting required and per-caller (shared provider key + SQLite single writer); limit value is a deployment parameter | `SPEC.md` §20.7 | *specified, not built* |
+
+## Tier 1 logging + staging API — BUILT 2026-09-15 (§19.6, §20.9–§20.13)
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A55 | Tier 1 logging in a separate DB (`data/logs.db`, WAL + `busy_timeout`); one row per UI and API question with the §19.2 fields and no text; main DB unchanged | `activity_log.py`; `tests/test_activity_log.py` (fields/no-text, never-raises, refusal rate); UI write in `ui/chat_view.py::_run_turn`; API write in `service/api.py` | ✅ |
+| A56 | API is a separate process reusing `retrieval/`/`prompting/`/`models/`; no API code in Streamlit | `service/engine.py`, `service/api.py`, `python -m service.api`; inspected imports | ✅ |
+| A57 | Binds `127.0.0.1` only; refuses to start otherwise, naming OPEN-13/OPEN-14 | `service/api.py::resolve_host`; `tests/test_api_staging.py` (bind guards) | ✅ |
+| A58 | Single static `KB_API_KEY` header; missing/wrong → 401, no answer, Tier 1 row still written; explicitly not production auth | `service/api.py::process_request`; `tests/test_api_staging.py::test_missing_key_401_and_still_logged`, `test_wrong_key_401` | ✅ |
+| A59 | `{workspace, question, model?}` request → `{answer, sources:[{document,section,page}]}`; `page` null; no `grounded` flag | `service/engine.py`; `service/api.py`. Success path needs a live endpoint (not automated) | ✅ *success path unverified here* |
+| A60 | Empty retrieval → documented refusal + `sources: []`, no fabrication | `service/engine.py` (`REFUSAL_TEXT`, zero-chunk branch) + `outcome='refused'` logged | ✅ |
+| A61 | Documented errors (unknown workspace, bad/missing key, no model, provider failure, oversized, malformed); no stack traces | `service/api.py::process_request`; `tests/test_api_staging.py` (413/400/404/503/401); live smoke: 401/404/503 | ✅ |
+| A62 | Rate limiting deliberately absent in staging; no per-caller identity; no Tier 2 | `SPEC.md` §20.13; no such code | ✅ (by absence) |
 
 ## Not verifiable without owner inputs
 

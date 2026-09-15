@@ -670,6 +670,20 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 - A53. Bad Workspace, unknown caller, provider failure, oversized request, no model configured, and malformed request each return a distinct documented HTTP status and machine-readable error code, with no stack traces.
 - A54. Rate limiting is specified as required and per-caller, with the reason recorded (a single shared provider credential and the SQLite single writer); the limit value is a deployment parameter, not fixed here.
 
+**Tier 1 logging — built** (§19) — 2026-09-15.
+
+- A55. Tier 1 activity logging (§19.2) is implemented: every question writes one Tier 1 row — from the UI (`source="ui"`) and the API (`source="api"`) alike — recording exactly the listed metadata fields and **no** question or answer text. The log database is a separate SQLite file (`data/logs.db`) opened with WAL + `busy_timeout`; the main database is unchanged and needs no schema change for the two writers.
+
+**Service interface — staging subset built** (§20.9–§20.13) — 2026-09-15; PoC/staging scope, superseded before production.
+
+- A56. The API is a separate process (`service/api.py`) that reuses `retrieval/`, `prompting/`, and `models/` with no duplicated retrieval/prompt/answer logic, and has no API code inside the Streamlit app.
+- A57. The API binds to `127.0.0.1` only and refuses to start if configured to bind elsewhere, with an error naming OPEN-13 and OPEN-14. This loopback binding — not policy — makes the staging API network-unreachable despite the unanswered access questions.
+- A58. A single static key `KB_API_KEY` (from `.env`) authenticates the caller via a request header; a missing or wrong key returns the documented `401`, produces no answer, and still writes a Tier 1 row. This is explicitly not the production model (shared secret, no per-caller identity, no revocation, no audit).
+- A59. The endpoint accepts `{workspace, question, model?}` (`workspace` is the id, never the name) and returns `{answer, sources}` where each source is structured `{document, section, page}` and `page` is `null` where the stored format does not support it. The response contains no `grounded` flag.
+- A60. When retrieval finds nothing, the API returns the documented refusal with `sources: []` and does not fabricate content.
+- A61. The API returns distinct documented errors — machine-readable codes, no stack traces — for unknown workspace, bad/missing key, no model configured, provider failure, oversized request, and malformed request.
+- A62. Rate limiting is deliberately absent in staging (one localhost caller); A54 remains the production requirement. Per-caller identity/membership mapping and Tier 2 logging are likewise not built.
+
 ---
 
 ## 11. Open questions
@@ -1233,6 +1247,36 @@ Workspace. The exact window is not fixed here.
   Workspace Owner.
 - Recording the question or answer text in Tier 1 under any circumstances.
 
+### 19.6 Tier 1 build notes (2026-09-15) `[NEW]`
+
+Building **Tier 1 only** (§19.2); Tier 2 stays unbuilt. Decisions taken at build
+time:
+
+- **Log database path:** `data/logs.db` — a separate file, git-ignored, excluded
+  from any knowledge-base backup (§19.1).
+- **Schema:** one table `tier1_turn_log` carrying exactly the §19.2 fields.
+  `outcome` permits `answered` / `refused` / `error`.
+- **Concurrency:** every log connection sets `PRAGMA journal_mode = WAL` and
+  `PRAGMA busy_timeout = 8000`, the same policy as `db.get_connection()` (§6.1).
+  WAL allows one writer and many readers; `busy_timeout` absorbs the momentary
+  lock between the Streamlit and API processes. Each log write is a single-row
+  insert on a short-lived connection.
+- **The main database needs NO change.** It already uses WAL + `busy_timeout`.
+  The API only **reads** the main database (Workspace instructions + chunks); it
+  does not create Chats or Messages (§20.8). So the API adds no writer to the
+  main database — no schema change, nothing for the owner to approve.
+- **A logging failure never fails a question:** `log_turn()` swallows its own
+  exceptions. A question with no log row is acceptable; a failed question because
+  logging failed is not.
+- **`refused` population is deferred to OPEN-15.** The application cannot observe
+  groundedness (§19.3). Tier 1 records `outcome='answered'` on a completed turn
+  and `outcome='error'` on a failure. The one refusal the application *can*
+  observe is an **empty retrieval** (`chunks_retrieved = 0`), which the API
+  short-circuits to the documented refusal (§20.5) and logs as
+  `outcome='refused'`. The wider refusal rate — chunks retrieved but not
+  answering — needs the signal OPEN-15 has not decided. **Recorded, not
+  resolved.**
+
 **Acceptance criteria:** A42–A47 (§10).
 
 ---
@@ -1319,6 +1363,12 @@ A single endpoint, `POST /v1/answer`, `Content-Type: application/json`.
   `.env` values are (§14.2). It is never logged: Tier 1 records the caller
   identifier, not the credential.
 
+**Amendment (2026-09-15) — staging exception.** §20.9–§20.13 define a
+**localhost-only** staging build, permitted *despite* the constraint above because
+it is unreachable from the network **by construction, not by policy**. It does not
+answer OPEN-13 or OPEN-14 and does not depend on their answers; production remains
+blocked until they are resolved.
+
 ### 20.5 When retrieval finds nothing `[NEW]`
 
 If retrieval returns no chunks, the response is the documented refusal
@@ -1381,7 +1431,74 @@ this does not prescribe which.
 - MCP transport specifics: F7 names "API / MCP"; this section specifies the answer
   contract, which either transport would carry. Do not build either yet.
 
-**Acceptance criteria:** A48–A54 (§10).
+### 20.9 Staging subset — scope and architecture `[NEW]`
+
+Specified and built 2026-09-15 for a staging environment the owner controls, to
+exercise the service end to end before the production questions (OPEN-13,
+OPEN-14, OPEN-15) are settled. **Everything in §20.9–§20.13 is PoC/staging scope
+and is superseded before production.**
+
+- The API is a **separate process** (`service/api.py`, started with
+  `python -m service.api`) that **reuses** `retrieval/hybrid_search.py`,
+  `prompting/assemble.py`, and `models/router.py`. It duplicates none of that
+  logic, and it contains **no API code inside the Streamlit app**.
+- API calls are **not** persisted as Chats or Messages (§20.8).
+- The API reads the existing main database for Workspace instructions and chunks;
+  it writes only to the log database (§19).
+
+### 20.10 Binding — the OPEN-14 containment `[NEW]`
+
+**Loopback binding is the entire access control for staging, and it is not
+negotiable.**
+
+- The service binds to **`127.0.0.1` only** — never `0.0.0.0`, never a LAN or
+  host address.
+- If configured to bind anywhere else, the service **refuses to start**, with an
+  error that names **OPEN-13** and **OPEN-14** as the reason.
+- This is what makes the staging API safe despite the unanswered access
+  questions: it is **unreachable from the network by construction, not by
+  policy.** OPEN-13 and OPEN-14 remain unanswered; this build neither answers
+  them nor depends on their answers.
+
+### 20.11 Authentication — deliberately minimal and temporary `[NEW]`
+
+- A **single static key** `KB_API_KEY` (from `.env`, §14.2) is sent in a request
+  header.
+- A missing or wrong key returns the documented `401`, produces **no answer**,
+  and **still writes a Tier 1 row** (outcome `error`, `error_type` =
+  `unauthenticated`).
+- **This is NOT the production model.** It is one shared secret with no
+  per-caller identity, no revocation, and no audit of who used it. §17 F10 and
+  OPEN-13/OPEN-14 supersede it. It exists only so the staging endpoint is not wide
+  open to whatever else is running on the machine.
+
+### 20.12 Endpoint, response, and errors `[NEW]`
+
+- `POST /v1/answer`, `Content-Type: application/json`.
+- **Request:** `{ "workspace": "<workspace_id>", "question": "<text>", "model":
+  "<model_id>" }` (`model` optional). `workspace` is the **id**, never the name.
+- **Response:** `{ "answer": "<text>", "sources": [ { "document": "...",
+  "section": "...", "page": null } ] }`. `sources` is the retrieved set (§20.3);
+  `page` is `null` because the stored chunk record has no page field — the format
+  does not currently support it. **No `grounded` flag** (OPEN-15); an empty
+  `sources` list is the only signal.
+- **Empty retrieval** → the documented refusal with `sources: []`, no model call,
+  no fabrication (§20.5).
+- **Errors** use the §20.6 table **minus `rate_limited`**: `400 invalid_request`,
+  `404 workspace_not_found`, `401 unauthenticated`, `503 model_unavailable`,
+  `502 provider_error`, `413 request_too_large`. No stack traces.
+
+### 20.13 Deliberately not built in staging `[NEW]`
+
+- **No rate limiting.** A54 remains the production requirement; on localhost with
+  one caller it is not needed.
+- **No per-caller identity or membership mapping.** One key, one everything.
+- **No Tier 2 logging.**
+- **No page-number capture** (see §20.12) — that would be an ingestion change and
+  a corpus re-processing.
+- No conversation persistence for API calls.
+
+**Acceptance criteria:** A48–A62 (§10).
 
 ---
 

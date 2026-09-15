@@ -38,6 +38,11 @@ _ENV_VARS = (
     "OPENAI_MODEL_REASONING",
     "OPENROUTER_API_KEY",
     "OPENROUTER_API_KEY_EXPIRES",
+    # Staging API config (SPEC §20.9-§20.13) — blanked so tests are deterministic
+    # and never inherit a developer's real .env.
+    "KB_API_KEY",
+    "KB_API_HOST",
+    "KB_API_PORT",
 )
 
 

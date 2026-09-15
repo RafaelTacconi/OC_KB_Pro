@@ -226,6 +226,41 @@ Consequence: The suite can report a spurious failure under load, and a real regr
 error path could be masked by assuming this test is flaky. **Do not weaken or skip the test.** If it
 recurs, capture the traceback and consider raising `default_timeout`.
 
+### Deferred fix — xlsx row counting (title block) — 2026-09-15
+Question: How should `parse_xlsx` count data rows when a sheet has a title/subtitle block above the real header?
+Outcome: **Approved as a diagnosis, NOT approved to build.** Root cause and a proposed fix are in
+the Codebase discoveries entry of 2026-09-15. Two owner reservations must be carried into any
+eventual build:
+1. The proposed header-detection rule (first row whose non-empty width equals the sheet's maximum
+   width) is a heuristic like the heading one. If it picks the wrong row, **every column is
+   mislabelled — a worse and quieter failure than a wrong count.** Any fix MUST have an obviously
+   safe fallback when the shape is ambiguous, and must **prefer being unsure to being confidently
+   wrong**.
+2. It forces **re-ingestion of every `.xlsx` in every Workspace** (the owner has already re-uploaded
+   the corpus three times). The fix should travel with **other ingestion work**, so one re-upload
+   buys several improvements.
+Authority: Deferred — not reached (owner decision 2026-09-15: diagnosis approved, build not approved).
+Consequence: The defect stands; do not build the xlsx fix alone. Not lost, not to be re-litigated.
+
+### Staging API + Tier 1 logging — SPEC §19.6 / §20.9-§20.13 — 2026-09-15
+Question: How to expose the service for end-to-end staging use while OPEN-13/OPEN-14 remain
+unanswered, and how to log it?
+Outcome: **Built.** (a) **Tier 1 logging only**, into a separate `data/logs.db`; the main database is
+unchanged. (b) The API is a **separate process** (`python -m service.api`) that reuses
+`retrieval/`, `prompting/`, and `models/`; no API code in the Streamlit app. (c) **Loopback-only
+binding (`127.0.0.1`), enforced at startup by refusing to start otherwise and naming OPEN-13/OPEN-14
+— this is the OPEN-14 containment: unreachable by construction, not by policy.** (d) **A single
+static `KB_API_KEY` shared secret**, explicitly temporary: no per-caller identity, no revocation, no
+audit. (e) No rate limiting, no Tier 2, no per-caller membership. (f) **SQLite concurrency:** the log
+DB uses WAL + `busy_timeout`; the API only READS the main DB, so it adds no writer and **no main-DB
+schema change is needed**.
+Authority: Answered by project owner on 2026-09-15 (owner directed the staging build and its
+constraints; OPEN-13/14/15/16 deliberately left unanswered).
+Consequence: The staging API is reachable only from the same machine; production remains blocked on
+OPEN-13/OPEN-14, and `KB_API_KEY` must be replaced by §17 F10's identity model. The refusal rate is
+computable for the API's empty-retrieval case (`outcome='refused'`); the wider refusal signal is
+still OPEN-15 (SPEC §19.6).
+
 ---
 
 ## Codebase discoveries
@@ -520,6 +555,16 @@ as the first row matching the sheet's maximum non-empty-cell width (skipping a n
 count only rows after it, and render an explicit 1-based row-number column so the last number is the
 count and line-count inference is impossible. An ingestion change here requires **re-processing every
 xlsx Source** (docx/pdf unaffected).
+
+### 2026-09-15 — The answer pipeline WAS cleanly callable outside the UI (two small frictions)
+`retrieval.hybrid_search`, `prompting.assemble.build_prompt`, and `models.router.call_model` were
+callable from the new `service/engine.py` with **no changes and no Streamlit import**. Two frictions
+worth recording: (1) `ui/chat_view.py::_run_turn` cannot be reused by the API — it lives in a
+Streamlit-importing module and also persists Chat rows, which §20.8 forbids for API calls — so the
+engine has its own small orchestration. (2) `_load_workspace()` exists only inside
+`ui/chat_view.py`; the engine keeps its own 5-line read rather than importing `ui` (which would pull
+Streamlit into the API process). Nothing needed a workaround; if a third caller appears, those two
+reads should move to a non-UI module.
 
 ---
 

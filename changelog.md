@@ -7,6 +7,60 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Tier 1 logging + staging service API (SPEC §19.6, §20.9-§20.13; A55-A62)
+
+Built the first slice of §19/§20: **Tier 1 logging** and a **localhost-only staging API**. Spec
+written first (§19.6; §20.9–§20.13; A55–A62; an amendment to §20.4). No existing section, criterion,
+or OPEN item was renumbered.
+
+**Job A — Tier 1 logging (`activity_log.py`).**
+- Separate SQLite file `data/logs.db` (WAL + `busy_timeout`). The main database is **unchanged** —
+  the API only reads it, so it adds no writer and **no schema change**.
+- One Tier 1 row per question from **both** the UI (`ui/chat_view.py::_run_turn`, `source="ui"`) and
+  the API (`source="api"`), with exactly the §19.2 fields — never question or answer text.
+- `log_turn()` swallows its own failures; a logging failure never fails a question.
+- `outcome` is `answered`/`error`; `refused` is set only by the API's empty-retrieval short-circuit.
+  The wider refusal signal is **OPEN-15 and deliberately not decided** (recorded in §19.6).
+
+**Job B — staging service API (`service/`).**
+- `service/engine.py` reuses `retrieval/`, `prompting/`, and `models/` — no duplicated logic, no
+  Streamlit.
+- `service/api.py` — stdlib `ThreadingHTTPServer` (**no new dependency**), `POST /v1/answer`,
+  structured `{document, section, page}` sources (`page` is null — no page field is stored), no
+  `grounded` flag.
+- **Binds `127.0.0.1` only and refuses to start otherwise**, naming OPEN-13/OPEN-14.
+- Single static `KB_API_KEY` header (temporary, not the production model); missing/wrong → 401 and a
+  Tier 1 row is still written.
+- No rate limiting, no per-caller identity, no Tier 2, no API-call persistence.
+
+**Job C — `scripts/measure_open16.py`** (not in pytest; changes no retrieval setting): sends one
+question bare / with short case context / with long case context to the running API and prints the
+answer + structured sources, to measure OPEN-16 by hand.
+
+**Schema and migration changes**
+- None. The log database is new and separate; the main database is untouched.
+
+**Files added / modified**
+- Added: `activity_log.py`, `service/__init__.py`, `service/engine.py`, `service/api.py`,
+  `scripts/measure_open16.py`, `tests/test_activity_log.py`, `tests/test_api_staging.py`.
+- Modified: `ui/chat_view.py` (Tier 1 logging in `_run_turn`), `tests/conftest.py` (blank `KB_*`),
+  `.env.example`, `SPEC.md`, `memory.md`, `changelog.md`, `state.md`.
+
+**Acceptance criteria satisfied**
+- A55 (Tier 1 built); A56–A62 (staging API). A42–A54 remain the specified contract; A54 rate
+  limiting is explicitly deferred in staging (A62).
+
+**Known-broken / deferred**
+- The API **success** path needs a live model endpoint and was not exercised here (only 401/404/503
+  were).
+- `page` is always null until ingestion stores a page field.
+- The wider refusal-rate signal remains OPEN-15.
+- Tier 2 logging, rate limiting, and per-caller identity are not built (§20.13).
+
+**Tests:** 79 → **93 passed**.
+
+---
+
 ## 2026-09-15 — Real-document validation recorded; xlsx row-count defect investigated (no code change)
 
 Documentation only. **No code and no test was touched.**

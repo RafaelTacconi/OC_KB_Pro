@@ -17,11 +17,13 @@ and never does its own prompt string concatenation (Section 9).
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from datetime import datetime, timezone
 
 import streamlit as st
 
+from activity_log import log_turn
 from db import transaction
 from models.registry import DEFAULT_MODEL_ID, get_model_spec, list_models, provider_model_name
 from models.router import call_model
@@ -241,20 +243,43 @@ def _run_turn(
     render it INLINE (issue #5) so the spinner transitions straight into the
     answer instead of closing before the rerun paints it.
     """
-    workspace = _load_workspace(workspace_id)
+    started = time.perf_counter()
+    chunks: list[dict] = []
+    degraded = False
+    retrieval_ms: float | None = None
+    try:
+        workspace = _load_workspace(workspace_id)
 
-    retrieval_query = user_input if not task else f"{task['name']} {user_input}"
-    chunks, degraded = hybrid_search(retrieval_query, workspace_id, top_k=5)
+        retrieval_query = user_input if not task else f"{task['name']} {user_input}"
+        t0 = time.perf_counter()
+        chunks, degraded = hybrid_search(retrieval_query, workspace_id, top_k=5)
+        retrieval_ms = (time.perf_counter() - t0) * 1000.0
 
-    prompt = build_prompt(
-        workspace_instructions=workspace.get("instructions", ""),
-        retrieved_chunks=chunks,
-        user_input=user_input,
-        task_prompt=task["prompt"] if task else None,
-        model_id=model_id,
-    )
+        prompt = build_prompt(
+            workspace_instructions=workspace.get("instructions", ""),
+            retrieved_chunks=chunks,
+            user_input=user_input,
+            task_prompt=task["prompt"] if task else None,
+            model_id=model_id,
+        )
 
-    answer_text = call_model(prompt, model_id=model_id)
+        answer_text = call_model(prompt, model_id=model_id)
+    except Exception as exc:  # noqa: BLE001 - §7.1 handler; log Tier 1, then re-raise
+        log_turn(
+            "ui",
+            workspace_id=workspace_id,
+            requester=user_id,
+            chat_id=chat_id,
+            question_chars=len(user_input),
+            chunks_retrieved=len(chunks),
+            lexical_degrade=degraded,
+            model_slug=provider_model_name(model_id),
+            retrieval_ms=retrieval_ms,
+            total_ms=(time.perf_counter() - started) * 1000.0,
+            outcome="error",
+            error_type=type(exc).__name__,
+        )
+        raise
 
     cited_sources = [
         {
@@ -272,6 +297,19 @@ def _run_turn(
         retrieved_chunk_ids=retrieved_chunk_ids,
         task_id=task["task_id"] if task else None,
         model_id=model_id,
+    )
+    log_turn(
+        "ui",
+        workspace_id=workspace_id,
+        requester=user_id,
+        chat_id=chat_id,
+        question_chars=len(user_input),
+        chunks_retrieved=len(chunks),
+        lexical_degrade=degraded,
+        model_slug=provider_model_name(model_id),
+        retrieval_ms=retrieval_ms,
+        total_ms=(time.perf_counter() - started) * 1000.0,
+        outcome="answered",
     )
     return degraded, answer_text, cited_sources
 

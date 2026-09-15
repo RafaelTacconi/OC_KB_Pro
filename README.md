@@ -125,10 +125,15 @@ A proof of concept.
   warning only (§15.1).
 - **No cross-Workspace search** (OPEN-10).
 - **No way to delete a Workspace or a Chat** (OPEN-6, OPEN-8).
-- **No logging yet** (§19 is specified but not built).
-- **No API yet** (§20 is specified but not built).
-- **Heading detection in citations is a shape heuristic** validated only against
-  the synthetic test corpus, not against real documents (A29 caveat).
+- **Logging is metadata-only so far.** Tier 1 activity logging is built (a separate
+  log database: counts, timings, outcomes — never question or answer text). Tier 2
+  (question/answer text, per-Workspace, off by default) is not built.
+- **The API is a staging subset, not a production one.** It exists but is
+  localhost-only, with a single shared static key, no rate limiting and no
+  per-caller identity — superseded before production (SPEC §20.9–§20.13).
+- **Heading detection in citations is a shape heuristic** validated against a real
+  bank procedure for Word headings, but not against PDFs with sentence-style or
+  unnumbered headings (A29 caveat).
 
 ## Running it
 
@@ -155,9 +160,27 @@ streamlit run app.py
   use. Without a network route to it, ingestion fails and writes the error to the
   Source row rather than crashing.
 
+### Staging service interface (optional)
+
+A separate process exposes the same answer engine over HTTP, **on `127.0.0.1`
+only** (SPEC §20.9–§20.13). It refuses to start on any other address. Add
+`KB_API_KEY` to `.env` first.
+
+```bash
+# Terminal 1 — start the API (loopback only)
+python -m service.api
+
+# Terminal 2 — measure retrieval with the same question, with and without case context
+python scripts/measure_open16.py <workspace_id> "your question"
+```
+
+The endpoint is `POST /v1/answer` with `{"workspace": "<id>", "question": "..."}`
+and an `X-API-Key` header; it returns the answer and structured sources.
+
 ## Where to look
 
-- `SPEC.md` — the authority for behaviour; every claim in this README traces to it.
+- `SPEC.md` — the authority for behaviour; every claim in this README traces to it
+  (§19 logging, §20 service interface, §20.9–§20.13 staging subset).
 - `memory.md`, `state.md`, `changelog.md` — the project journal: decisions and
   discoveries, current position, and what actually shipped.
 - `ACCEPTANCE_MATRIX.md` — maps each acceptance criterion (A-number) to the test
