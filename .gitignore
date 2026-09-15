@@ -21,3 +21,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Real-corpus positive-case regression set — off-repo only, never committed
+GROUNDING_REGRESSION_POSITIVE.md

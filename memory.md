@@ -713,6 +713,21 @@ is completely unmeasured**. **No fix is approved and none is proposed.** A fix n
 set of questions whose answers are known to be in the corpus — the mirror of
 `GROUNDING_REGRESSION.md` — which does not exist yet.
 
+### 2026-09-15 — Positive-case regression set built; lives OFF-REPO (NBCA real corpus)
+Built `GROUNDING_REGRESSION_POSITIVE.md` (14 cases; all `NOT YET RUN` except the known `FAIL`
+PC-01) — the **answer-when-it-can** mirror of `GROUNDING_REGRESSION.md`. It is **corpus work**:
+every case was verified by reading the NBCA chunk TEXT directly (never by section title) and
+carries a durable **locating phrase** because `chunk_id`s are regenerated on re-ingestion.
+Coverage: 4 simple lookups, 3 xlsx-table cases, the SOP "Key contacts" chunk `3d03f4c1…`
+flagged **AT RISK**, 4 short-chunk cases, one two-chunk case, and one PDF case (the PDF
+duplicates the SOP/xlsx and is **not uniquely answerable**). **It is NOT YET RUN and no
+retrieval/prompt setting is changed by it.** The file is written to the repo folder but is
+**deliberately NOT committed**: it is built on the real anonymised **NBCA** bank procedure
+(staff names, desk codes, internal process detail) and this repo is public —
+`GROUNDING_REGRESSION.md` is committed only because it used the synthetic corpus. `.gitignore`
+now lists it as a backstop. **The file must be moved off-repo (owner's desktop, with the other
+off-repo test assets); never commit it.**
+
 ---
 
 ## Rejected approaches
