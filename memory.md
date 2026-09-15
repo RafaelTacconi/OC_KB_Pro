@@ -728,6 +728,22 @@ retrieval/prompt setting is changed by it.** The file is written to the repo fol
 now lists it as a backstop. **The file must be moved off-repo (owner's desktop, with the other
 off-repo test assets); never commit it.**
 
+### 2026-09-15 — PDF section titles are WRONG: A29 caveat now has evidence against it (record only; owner to decide)
+In `NBCA_Quick_Reference_Card.pdf`, chunk `29b4dc3fd7c2493799d4c9866bc41ae5` contains the three
+escalation conditions but carries `section_title` **"CLAIM_NO_MATCHING_BREAK"** — a heading that
+belongs to different content. Section titles are what the **citation chips display**, so a PDF
+source can be cited under a **wrong section name**: the answer correct, the citation wrong, in a
+tool whose value rests on **checkable citations**. This bears directly on **A29**, recorded as
+**partially discharged** — correct for real numbered Word headings, **unvalidated for PDFs with
+sentence-style headings**. It is now **validated for this PDF and it FAILS**: the caveat now has
+**evidence against it.** **A29's status is NOT changed, `SPEC.md` is NOT edited, and no criterion
+is added — the owner must decide what follows.** **No fix, no investigation.**
+
+**LEAD (not a finding):** the same PDF's chunk text has **TAB characters between individual
+words**, indicating a **mangled parse**. This **may** contribute to the PDF never having been
+retrieved in ~40 observed source slots. **Untested — do not investigate and do not tune
+anything.**
+
 ---
 
 ## Rejected approaches

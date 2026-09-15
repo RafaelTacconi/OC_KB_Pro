@@ -7,6 +7,39 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Measurement tool: `scripts/run_question_set.py` (bare-question runner; no retrieval/prompt change)
+
+New measurement script, companion to `scripts/measure_open16.py` (same category: not a test, not
+collected by pytest, imports nothing, changes no retrieval setting or prompt). It sends each
+question in a plain-text file **BARE** to the staging API, prints question/answer/sources numbered
+per result, and reports answered-vs-refused counts judged only by **empty sources** (refusal
+correctness is the reader's call). No corpus content is embedded and no default path points inside
+the repo.
+
+- Also recorded in `memory.md`: **PDF section titles are wrong** in
+  `NBCA_Quick_Reference_Card.pdf` (chunk `29b4dc3f…` carries title "CLAIM_NO_MATCHING_BREAK") —
+  **A29's PDF caveat now has evidence against it; A29 status unchanged; owner to decide.** Plus,
+  as a **LEAD not a finding**, the PDF's tab-separated chunk text (mangled parse). No fix, no
+  investigation.
+
+**Schema and migration changes**
+- None.
+
+**Files added / modified**
+- Added: `scripts/run_question_set.py`.
+- Modified: `memory.md`, `changelog.md`.
+
+**Acceptance criteria**
+- None changed. No SPEC.md edit; no OPEN item.
+
+**Known-broken / deferred**
+- The script asserts nothing and is not run here; it needs a live endpoint and an off-repo
+  questions file.
+
+**Tests:** `python -m pytest tests/ -q` → **94 passed** (`.venv`; `pypdf` present).
+
+---
+
 ## 2026-09-15 — Docs: over-refusal defect recorded (prompt-level, positive-case failure; evidence only; no code change; no fix)
 
 ---
