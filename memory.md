@@ -608,6 +608,50 @@ page. So the API's always-null `page` (SPEC §20.13) is an **ingestion gap, not 
 populating it would require capturing and storing a page number during parsing, i.e. an ingestion
 change and a corpus re-processing.
 
+### 2026-09-15 — OPEN-16 first live measurement: rank drift vs. distinct-document count (EVIDENCE ONLY; OPEN-16 REMAINS UNANSWERED)
+First live run of `scripts/measure_open16.py` against `aml-workspace` on 2026-09-15, question
+*"What triggers an enhanced due diligence review?"*, three ways (bare / short case context /
+long case context). This records observations, not a finding. **No retrieval setting was changed
+(`top_k`, `MAX_RETRIEVED_TOKENS`, `rrf_k`, `candidate_pool`, chunk sizes all untouched), no
+acceptance criterion was added, and OPEN-16 is not answered, resolved, or narrowed to a mechanism
+by this entry.** All three runs answered correctly; the correct chunk (`AML_Policy.pdf`,
+"4. Enhanced Due Diligence Threshold") was retrieved every time, but its rank drifted as context
+grew: **bare = rank 1, short context = rank 1, long context = rank 3.**
+
+- **Failure mode observed is RANK DRIFT, not an outright miss.** With five retrieval slots, drift
+  of this size would eventually push a correct chunk off the list on a larger corpus. On the nine
+  documents of this run it did not.
+- **Chunks that overtook it under long context were "2. Escalation Timeline" and "5. Record
+  Retention".** A **PLAUSIBLE reading — recorded explicitly as a HYPOTHESIS consistent with one
+  observation, NOT a demonstrated rule and NOT a confirmation of the OPEN-16 mechanism — is that
+  the pasted case data (dates, amounts, account references) matched timeline/retention language.**
+  It has not been tested.
+- **DISTINCT-DOCUMENT COUNT, which cuts the other way:** the bare and short runs each returned 5
+  chunks from only **TWO distinct documents**; the long-context run returned 5 chunks from
+  **THREE**, and was the only run to retrieve `AML_Thresholds.xlsx`, which holds the per-band
+  overrides. Extra context **broadened what was considered as well as reordering it.**
+  Cross-reference: the existing Step 8 finding that top-5 often considers far fewer than five
+  distinct documents.
+- **The two observations PULL IN OPPOSITE DIRECTIONS.** Rank drift is evidence that case context
+  HURTS retrieval; the widened distinct-document count is evidence that it HELPS. They come from
+  the same single run and NEITHER HAS BEEN WEIGHED AGAINST THE OTHER. Nine documents cannot settle
+  it. **STANDING INSTRUCTION: whoever re-runs this at scale must measure BOTH — the rank of the
+  correct chunk AND the number of distinct documents retrieved — because measuring rank alone would
+  show only the pessimistic half and would look like a conclusion.**
+- **SAMPLE SIZE:** exactly ONE question, with ONE case-context payload, on a nine-document
+  synthetic corpus. Nothing here generalises. A re-run needs multiple questions and multiple
+  payloads before any of it counts as a finding.
+- Every source returned `page=None`, as expected (ingestion gap, already recorded above).
+- **NOT recorded as a finding:** subjective answer quality — one question, no controlled comparison.
+
+### 2026-09-15 — staging API first live run: operational notes (observations, not defects)
+From the same first live run as the OPEN-16 measurement above:
+- The API **loads the embedding model at startup (103/103)**. Running it alongside Streamlit means
+  **two copies of the model in memory.**
+- The API **exited silently once on first launch**, printing its banner and returning to the prompt
+  with no error. Not reproduced on re-run. Recorded as an **observation, not a defect — do not
+  investigate or change anything.**
+
 ---
 
 ## Rejected approaches

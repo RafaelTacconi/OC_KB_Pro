@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Docs: OPEN-16 first live measurement recorded (evidence only; no code change; OPEN-16 still unanswered; rank 1/1/3, distinct docs 2/2/3)
+
+---
+
 ## 2026-09-15 — Corrections: UI refusal signal, 413 code, OPEN-2 staging deviation (A63)
 
 Four corrections to the staging slice built in `174fb95`. Spec first where logging/contract changed;

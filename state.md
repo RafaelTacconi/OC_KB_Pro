@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered)**.
 
 ---
 
@@ -140,13 +140,17 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Try the staging API end to end on your machine** (needs a live `.env` model
-endpoint): add `KB_API_KEY` to `.env`, then
-`python -m service.api` (terminal, venv active), then from a second terminal
-`python scripts/measure_open16.py <workspace_id> "your question"` to run the
-OPEN-16 three-way retrieval measurement. The API is loopback-only by construction
-and refuses to start otherwise; 401/404/503 paths are verified, the **success path
-needs your live endpoint** and has not been run here.
+**Re-run the OPEN-16 measurement at scale** (the first live run is recorded in
+`memory.md`, 2026-09-15; **OPEN-16 remains unanswered — no retrieval setting has
+changed**). The staging API success path and the three-way
+`python scripts/measure_open16.py <workspace_id> "your question"` run have now
+been exercised once against `aml-workspace`: one question, one case-context
+payload, nine documents — **not a finding**. Re-run with **multiple questions and
+multiple case-context payloads**, and **measure BOTH the rank of the correct chunk
+AND the number of distinct documents retrieved** (rank alone shows only the
+pessimistic half and would look like a conclusion). Do not change `top_k` /
+`MAX_RETRIEVED_TOKENS` / `rrf_k` / `candidate_pool` / chunk sizes until this says
+otherwise.
 
 Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
 was built; correct anything you disagree with. **The xlsx row-count fix stays
