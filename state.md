@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered)**.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); a prompt-level over-refusal defect (wrong refusal on a chunk that provably held the answer) recorded in `memory.md` — mechanism demonstrated, frequency unmeasured, no fix approved**.
 
 ---
 
@@ -140,17 +140,19 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Re-run the OPEN-16 measurement at scale** (the first live run is recorded in
-`memory.md`, 2026-09-15; **OPEN-16 remains unanswered — no retrieval setting has
-changed**). The staging API success path and the three-way
-`python scripts/measure_open16.py <workspace_id> "your question"` run have now
-been exercised once against `aml-workspace`: one question, one case-context
-payload, nine documents — **not a finding**. Re-run with **multiple questions and
-multiple case-context payloads**, and **measure BOTH the rank of the correct chunk
-AND the number of distinct documents retrieved** (rank alone shows only the
-pessimistic half and would look like a conclusion). Do not change `top_k` /
-`MAX_RETRIEVED_TOKENS` / `rrf_k` / `candidate_pool` / chunk sizes until this says
-otherwise.
+**Decide how to address over-refusal.** The 2026-09-15 NBCA run recorded a
+**positive-case failure** in `memory.md`: a wrong refusal ("The documents do not
+cover…") on a question whose answer was **provably in the rank-1 retrieved
+chunk** — ruled out as retrieval, chunking and ingestion failure, so it is
+**prompt-level**, the same layer as the seven §18 grounding failures. The
+mechanism is demonstrated; the **frequency is unmeasured**. **Deciding a fix
+requires first building a positive-case regression set** (questions whose answers
+are known to be in the corpus — the mirror of `GROUNDING_REGRESSION.md`, which
+does not exist yet). **No fix is approved and none should be proposed until that
+set exists; do not change retrieval settings or prompts.** The OPEN-16 re-run at
+scale (measure both correct-chunk rank and distinct-document count) remains
+outstanding — the NBCA 2/2/2 result **contradicts** the AML 2/2/3 widening, which
+is exactly why measurement at scale is needed; **OPEN-16 is still unanswered.**
 
 Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
 was built; correct anything you disagree with. **The xlsx row-count fix stays

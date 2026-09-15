@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Docs: over-refusal defect recorded (prompt-level, positive-case failure; evidence only; no code change; no fix)
+
+---
+
 ## 2026-09-15 — Docs: OPEN-16 first live measurement recorded (evidence only; no code change; OPEN-16 still unanswered; rank 1/1/3, distinct docs 2/2/3)
 
 ---

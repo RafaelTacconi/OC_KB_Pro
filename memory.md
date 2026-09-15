@@ -652,6 +652,67 @@ From the same first live run as the OPEN-16 measurement above:
   with no error. Not reproduced on re-run. Recorded as an **observation, not a defect — do not
   investigate or change anything.**
 
+### 2026-09-15 — DEFECT: over-refusal on retrieved material (positive-case failure; prompt-level; no fix)
+Workspace `d93d5cd12269400e9298c535062afc65` (NBCA), staging API, 2026-09-15. Question
+*"Where do escalated breaks go and who receives them?"* → answer *"The documents do not cover
+where escalated breaks go or who receives them."* **That refusal is WRONG; the evidence is the
+stored chunks, inspected read-only, not inferred:**
+
+- Rank-1 retrieved chunk was `3cbb9bc6e5834b72883fd8467c101e6d`
+  (`NBCA_Daily_Operations_SOP.docx`, "1. What this process is and why it exists", 353 tokens /
+  1,612 chars) and **provably contains** "Before the 11:00 escalation pack goes out to the desk
+  heads…".
+- The Glossary chunk `ee3eab046b4948dda80ad5ebc73e6ff5` was **also retrieved** and defines
+  "Escalation pack" as the 11:00 summary sent to desk heads.
+- The section is **ONE chunk** — not split, no boundary effect, title and body in the same chunk.
+
+**Ruled out explicitly (do not re-litigate):** NOT a retrieval failure (the correct chunk ranked
+1); NOT a chunking failure (single chunk, boundaries inspected); NOT an ingestion failure (the
+text is present and was inspected directly); NOT the "title without payload" concern (the payload
+was in the chunk). **This is PROMPT-LEVEL — the same layer as the seven §18 grounding failures.**
+
+**Why this class of failure was invisible:**
+- §18 and `GROUNDING_REGRESSION.md` test that the system REFUSES when it should. **Nothing tests
+  that it ANSWERS when it can** — the entire test history hunts fabrication; this is the opposite
+  failure and no suite covers it.
+- An unwarranted refusal is indistinguishable from correct behaviour to a reader, because refusal
+  is the tool's advertised virtue.
+- **Refusal rate (A46) cannot detect it:** the metric counts refusals, not whether they were
+  warranted; a rising rate would look like the documents having gaps.
+- Both observed refusals returned **NON-EMPTY sources**, so Tier 1 logs them as
+  `outcome='answered'` — they do not appear in the refusal count at all. A concrete instance of
+  the under-count already documented in §19.6.
+
+**SECOND OBSERVATION, same run set.** Question *"What is the escalation path when a nostro break
+cannot be matched?"*: **bare** refused but usefully — it distinguished the flagging rule from the
+routing, citing SOP section 3, with "3. The escalation rule" at **rank 5**; **short and long
+context**: "3. The escalation rule" dropped OUT of the top 5 entirely and the answers degraded to
+a bare "not specified". Distinct documents retrieved: **2 / 2 / 2** across all three conditions —
+**NO widening**, unlike the AML run (2 / 2 / 3). Recorded as further **OPEN-16 evidence;
+OPEN-16 REMAINS UNANSWERED.** The NBCA run **contradicts** the AML run on distinct-document
+widening — which is exactly why both must be measured at scale.
+
+**NEGATIVE CONTROL — PASSED.** *"What is the bank's policy on employee overtime pay?"* (outside
+the corpus) refused correctly in all three conditions, including with long reconciliation case
+context prepended. **§18 grounding held under pasted case data.** Recorded as evidence, not as a
+test result (`measure_open16.py` asserts nothing).
+
+**Two separate threads, NOT today's problem (record only — do not investigate, do not tune):**
+1. The SOP's "Key contacts" chunk `3d03f4c16bef464583963caee8d0cb1a` (79 tokens; Raman, Meyer,
+   Dubois, Baumann) has NEVER been retrieved in roughly 40 source slots. *"Who owns FR03
+   escalations?"* was answered correctly, but from
+   `NBCA_Exception_Matrix_Quick_Reference.xlsx` "Contacts & Ownership" instead. **Possible
+   short-chunk ranking disadvantage.**
+2. That same chunk carries a page-footer fragment ("Page of | Internal use – Custody
+   Operations"). Cosmetic. **Park it with the deferred xlsx header fix and the page-number
+   ingestion gap so one re-ingestion buys all three.**
+
+**SCOPE — do not overstate:** one question, one corpus, four documents. The **MECHANISM is
+demonstrated** (the text was provably in the retrieved chunk and was not used); the **FREQUENCY
+is completely unmeasured**. **No fix is approved and none is proposed.** A fix needs a regression
+set of questions whose answers are known to be in the corpus — the mirror of
+`GROUNDING_REGRESSION.md` — which does not exist yet.
+
 ---
 
 ## Rejected approaches
