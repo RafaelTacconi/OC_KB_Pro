@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); positive set run 15 bare questions → 14 correct / 1 refusal, so the earlier over-refusal entry is CORRECTED to 1/15 (an OPEN JUDGEMENT CALL, not a proven defect); PDF section titles confirmed misleading in citations; two earlier suspicions withdrawn; no fix approved**.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); positive set run 15 bare questions → 14 correct / 1 refusal, so the earlier over-refusal entry is CORRECTED to 1/15 (an OPEN JUDGEMENT CALL, not a proven defect); PDF section titles confirmed misleading in citations; **PDF chunk titles/bodies found MISALIGNED (citation can point at a chunk lacking the content); March 2026 date verified grounded, enquiry closed; four-item deferred ingestion bundle consolidated (nothing approved to build)**; two earlier suspicions withdrawn; no fix approved**.
 
 ---
 
@@ -140,19 +140,17 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Decide two things. (1) PC-01 — defect or correct strictness?** The positive set ran
-2026-09-15 (15 bare questions via `scripts/run_question_set.py`; see `memory.md`): **14 correct,
-1 refusal** (PC-01), so the earlier over-refusal entry is **corrected — the rate is 1/15, not a
-general tendency**. PC-01 reproduces with the answer-bearing chunks retrieved, but the
-destination appears only **incidentally** (a subordinate clause + a glossary definition) while
-all 14 passes state a declarative fact — so the refusal **may be intended §18 strictness**: an
-**OPEN JUDGEMENT CALL, not a proven defect**. Decide whether it is a defect or correct
-strictness. **(2) PDF section titles** are confirmed misleading in citations (run-on body text and
-page furniture used as `section_title`); decide whether that warrants an **ingestion fix** (bears
-on A29's PDF caveat; A29 status unchanged). **No fix is approved; do not change retrieval
-settings or prompts or `SPEC.md`.** The OPEN-16 re-run at scale (measure both correct-chunk rank
-and distinct-document count) remains outstanding; **OPEN-16 is still unanswered.** (Two earlier
-suspicions — short-chunk loss and the PDF never retrieving — are **withdrawn**; see `memory.md`.)
+**Spec the four-item ingestion bundle (spec first, then build).** Consolidate and specify, before
+any build: (1) **xlsx header detection** (`parse_xlsx` `header=0` bug, with the owner's two prior
+reservations); (2) **PDF heading extraction** — chunk titles/bodies are misaligned, so a citation
+can point at a chunk lacking the cited content (PC-11 passed with such a citation); (3)
+**page-number capture** — API `sources` always return `page=null`; (4) **page-footer bleed** (e.g.
+"Page of | Internal use" in the SOP "Key contacts" chunk). **All four travel in ONE re-ingestion
+pass**, and `GROUNDING_REGRESSION_POSITIVE.md` (**14 of 15 passing**; locating phrases, not chunk
+ids) is the **before/after acceptance check**. **Nothing is approved to build yet — spec first; do
+not change retrieval settings, prompts, or `SPEC.md`.** Also still open: decide whether **PC-01**
+is a defect or correct §18 strictness; and the **OPEN-16** re-run at scale (rank + distinct-doc
+count) — **OPEN-16 still unanswered.**
 
 Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
 was built; correct anything you disagree with. **The xlsx row-count fix stays

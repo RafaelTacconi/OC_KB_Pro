@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Docs: March 2026 date grounded (enquiry closed); PDF chunk titles/bodies misaligned; four-item deferred ingestion bundle consolidated (no code change)
+
+---
+
 ## 2026-09-15 — Docs: positive-set run recorded (15 bare questions → 14 correct / 1 refusal; over-refusal entry CORRECTED to 1/15; two suspicions withdrawn; PDF section titles confirmed misleading; no code change)
 
 ---

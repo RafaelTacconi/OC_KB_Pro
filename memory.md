@@ -790,6 +790,45 @@ demonstration of the documented under-count.
   **weak case** — title-block chunks rank highly for almost any question, so it can barely fail.
   **Low-value evidence.**
 
+### 2026-09-15 — March 2026 date GROUNDED (enquiry closed); PDF chunk titles/bodies MISALIGNED; deferred ingestion bundle consolidated
+**March 2026 date — grounded, not fabricated. ENQUIRY CLOSED.** An API answer stated the escalation
+thresholds came from a desk-head agreement "confirmed in March 2026". Read-only chunk inspection
+confirms the date **IS in the corpus**, in **three of the five** chunks retrieved for that answer:
+`1658a960c58940fa9ed2a738f7af00d3` (SOP, "Step 6") — "most recently March 2026";
+`9253c4581ee44b21806eac1a2f435511` (xlsx, "Escalation Rule") — "confirmed by Priya Raman", and
+separately "Last changed March 2026"; `a2789969e0b849c697416f29029181a5` (SOP, "On the escalation
+threshold"). **No fabrication occurred.** This line of enquiry is closed.
+
+**MINOR OBSERVATION (record only — do not act):** the documents say the thresholds were last
+**CHANGED** in March 2026 and were **CONFIRMED** by Priya Raman with **no date**. The answer merged
+these into "confirmed in March 2026" — a claim neither document makes. **Compression, not
+invention**, but the xlsx also says "reconfirm quarterly", so changed-vs-confirmed is a real
+distinction. Low severity, one instance, no fix proposed.
+
+**NEW FINDING — PDF chunk titles and bodies are MISALIGNED** (more serious than the earlier "PDF
+section titles are wrong"). In `NBCA_Quick_Reference_Card.pdf`:
+- Chunk `d740a2f1fc82499abccd19e36f3fc2a4` has `section_title` beginning "6 Apply the escalation
+  rule: >$10k AND >5 days AND not fast-close", but its **TEXT is only** "row. Reading the scanned
+  claim advice".
+- The actual escalation sentence lives in a **DIFFERENT** chunk,
+  `29b4dc3fd7c2493799d4c9866bc41ae5`, mislabelled "CLAIM_NO_MATCHING_BREAK".
+So PDF chunks carry **other chunks' headings**. Consequence: a **citation chip can point a user at
+a chunk that does not contain the cited content** — the citation is **not merely ugly, it is
+wrong**. The PDF case in the positive set (**PC-11**) **passed with a citation pointing at a chunk
+lacking the answer**. **This raises the priority of the PDF fix within the deferred ingestion
+bundle. No investigation, no fix proposed, A29/`SPEC.md` untouched.**
+
+**CONSOLIDATED DEFERRED INGESTION BUNDLE** (record only — **nothing is approved to build**). All
+four must travel in **ONE re-ingestion pass**; `GROUNDING_REGRESSION_POSITIVE.md` (**14 of 15
+passing**; locating phrases, **not** chunk ids) is the **before/after acceptance check** for that
+pass.
+1. **xlsx header detection** — the `parse_xlsx` `header=0` bug, carrying the owner's two prior
+   reservations.
+2. **PDF heading extraction** — titles misaligned with bodies (this entry).
+3. **Page-number capture** — chunks store nothing page-like, so API `sources` always return
+   `page=null`.
+4. **Page-footer bleed** — e.g. "Page of | Internal use" inside the SOP "Key contacts" chunk.
+
 ---
 
 ## Rejected approaches
