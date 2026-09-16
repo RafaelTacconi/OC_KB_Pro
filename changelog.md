@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-16 — Process: earlier journal entries exposed real corpus fragments in this public repo — forward-only fix; AGENTS.md hard rule 8 added; history rewriting rejected (no code change)
+
+---
+
 ## 2026-09-16 — Spec-only: §22 amended — confident-header rule, stale-citation behaviour, and script decision written; §22.5 tightened (furniture retained); A82 added (nothing built)
 
 ---

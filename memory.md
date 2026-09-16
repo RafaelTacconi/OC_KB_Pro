@@ -1103,3 +1103,36 @@ Amended `SPEC.md` §22 (spec only; nothing built) to replace three descriptions 
   updated (A64/A65/A77 wording amended; **A82 added**; title now A1–A82).
 **No `[OPEN]` item resolved.** No code, retrieval, or prompt change. Authority: **Answered by
 project owner on 2026-09-16.**
+
+### 2026-09-16 — Public-repo exposure: real corpus content in earlier journal entries — forward-only fix; AGENTS.md rule 8 added
+**Exposure, recorded as fact (categories only — the actual strings are deliberately NOT repeated
+here).** Earlier journal entries appended on 2026-09-15 and 2026-09-16 contain real corpus material
+from the NBCA documents: **contact surnames**, **two verbatim lines from the quick-reference card**,
+and **one personal name** in the March 2026 entry. Because the repository is **PUBLIC**, that
+material is already public.
+
+**Assessment (fact).** Severity **LOW**: the source documents are **anonymised**, the material is
+**fragmentary**, and **no procedure could be reconstructed from it**. The real problem is
+**INCONSISTENCY** — the same rule was enforced on one file (the off-repo positive set) and not on
+another (`memory.md`).
+
+**Deletion would not remove it.** Git retains every earlier version, so the text stays readable in
+prior commits unless the **entire history is rewritten**. Removing the lines would not un-expose
+them; it would only break the append-only journal.
+
+**Decision (owner, 2026-09-16) — FORWARD-ONLY fix.** The existing `memory.md` lines **STAY** — not
+edited, not redacted, not removed. A standing rule is added so it does not happen again.
+Repository history is **NOT** rewritten. **No `[OPEN]` item is involved.**
+
+**New standing rule — `AGENTS.md` Hard rule 8.** "**Never put real corpus content in a committed
+file.**" It names the forbidden material (document contents, verbatim procedure wording, personal
+or contact names, desk codes, file excerpts), the files it covers (`SPEC.md`, `memory.md`,
+`state.md`, `changelog.md`, `ACCEPTANCE_MATRIX.md`, `README.md`, code, comments, tests, any tracked
+file), the abstract-reference alternative, the off-repo companions
+(`GROUNDING_REGRESSION_POSITIVE.md`, `VISION_AND_BACKLOG.md`), and states it is **forward-only**
+(earlier breaching entries stand and must not be edited or redacted). Rules 1–7 unchanged.
+
+**REJECTED approach — history rewriting.** Rejected as **disproportionate to the risk**: rewriting
+history **changes every commit hash from that point forward**, breaking **every hash recorded in
+the journal**, for a **low-severity exposure of anonymised fragments**.
+Authority: **Answered by project owner on 2026-09-16.**

@@ -53,6 +53,18 @@ streamlit run app.py                                      # chat will fail until
    so deletion is unrecoverable. It has destroyed the owner's corpus three times. The test
    suite tolerates a pre-existing `data/`; a clean DB is achieved with a temp cwd, never by
    deleting `data/`. See `memory.md` "Rejected approaches".
+8. **Never put real corpus content in a committed file.** The repository is
+   PUBLIC. No document contents, no verbatim procedure wording, no personal or
+   contact names, no desk codes, and no file excerpts from the owner's real
+   documents may appear in SPEC.md, memory.md, state.md, changelog.md,
+   ACCEPTANCE_MATRIX.md, README.md, code, comments, tests, or any other tracked
+   file — regardless of whether the source documents are anonymised. Refer to
+   such material ABSTRACTLY instead, by pointing at the dated journal entry that
+   describes it. The concrete material stays off-repo, alongside
+   GROUNDING_REGRESSION_POSITIVE.md and VISION_AND_BACKLOG.md, which are never
+   read into or committed to this repository. This rule is forward-only: earlier
+   entries that already breach it stand as they are, by owner decision of
+   2026-09-16, and must not be edited or redacted.
 
 ## Environment limits
 
