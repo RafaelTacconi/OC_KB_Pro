@@ -1069,3 +1069,37 @@ against F8), and records its dependencies on A29 and the OPEN items **without re
 change. Public-repo hygiene: no real-corpus content in `SPEC.md`; the affected passages are
 referenced to the 2026-09-15 diagnosis entry in this file, and the concrete list stays off-repo.
 Authority: **Answered by project owner on 2026-09-16.**
+
+### 2026-09-16 — §22 amended: three holes filled (header rule; stale-citation behaviour; script decision), §22.5 tightened, A82 added
+Amended `SPEC.md` §22 (spec only; nothing built) to replace three descriptions with actual rules.
+
+- **Hole 1 — the confident-header rule, written into §22.2.** MAX = the greatest number of
+  non-empty cells in any row; a candidate = a row among the **first 10 rows** whose non-empty count
+  equals MAX; detection is **CONFIDENT iff EXACTLY ONE candidate** (that row is the header; the data
+  rows follow); **zero or more than one** candidate = **AMBIGUOUS**, and the first-row-as-header
+  fallback with stated uncertainty applies. A64/A65 amended only to name the rule.
+- **Hole 2 — stale-citation behaviour, written into §22.6 (and A77).** Read-only inspection of
+  `chat_messages` (2026-09-16) found a stored assistant message keeps `cited_sources` — a JSON list
+  of `{source_id, display_name, section_title}` (`section_title` may be null) — and, separately,
+  `retrieved_chunk_ids`, a JSON list of chunk-id strings, **index-aligned** with the citations but
+  **not embedded per citation** and **not rendered today**; the chip code
+  (`ui/cards.py::chips_html`) uses `display_name` + `section_title` only, so the stored record
+  carries **no page and no per-citation chunk id**. Behaviour specified: a citation whose
+  `retrieved_chunk_ids` no longer resolve **still renders, never crashes, never silently
+  disappears, never silently re-points**; shown from the stored identifying info and marked plainly
+  **"no longer available because the documents were re-ingested"**; **not clickable**; and a plain
+  **"Source no longer available"** fallback when the record cannot identify the source — **no
+  invented field**. Because no page is stored, a pre-change PDF citation cannot show a page.
+- **Hole 3 — script decision, written into §22.6 (and new A82).** The pass is a **script**,
+  `scripts/reingest_all.py` (spirit of the existing measurement scripts): a **tool, not a test**
+  (not under `tests/`, not collected by `pytest`, asserts nothing), run by the owner from his
+  terminal with the venv active; prints document and chunk counts per Workspace **BEFORE and
+  AFTER**; reads the original bytes under `data/{workspace_id}/sources/`; deletes nothing under
+  `data/`; **not written now**.
+- **Also:** the exact Windows pre-run copy command is now given verbatim in §22.6
+  (`Copy-Item data\workspace_app.db "data\workspace_app_YYYY-MM-DD.pre-reingest.db"`, date
+  substituted); and §22.5 is tightened — if removing furniture would empty a page, the furniture is
+  **RETAINED for that page**, one rule, no alternatives (A75 unchanged). `ACCEPTANCE_MATRIX.md`
+  updated (A64/A65/A77 wording amended; **A82 added**; title now A1–A82).
+**No `[OPEN]` item resolved.** No code, retrieval, or prompt change. Authority: **Answered by
+project owner on 2026-09-16.**

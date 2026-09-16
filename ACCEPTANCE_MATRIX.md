@@ -1,4 +1,4 @@
-# Acceptance matrix — A1–A81
+# Acceptance matrix — A1–A82
 
 Verified 2026-09-15 against current `main`. Method: each criterion is mapped to
 the test(s) or code that prove it, or is marked *not verifiable* / *specified, not
@@ -176,8 +176,8 @@ reading the off-repo positive set into the repository.
 
 | # | Criterion | Proof | Status |
 |---|---|---|---|
-| A64 | `parse_xlsx` identifies the real header row, counts only data rows after it, renders a 1-based row-number column; count visible/checkable | `SPEC.md` §22.2 | *specified, not built* |
-| A65 | Ambiguous header → fall back to first-row-as-header **and** state the uncertainty in the rendered sheet text | `SPEC.md` §22.2 | *specified, not built* |
+| A64 | `parse_xlsx` applies the §22.2 rule (MAX non-empty cells; candidate among first 10 rows with MAX; confident iff exactly one candidate), counts only data rows after the confident header, renders a 1-based row-number column; count visible/checkable | `SPEC.md` §22.2 | *specified, not built* |
+| A65 | Zero or >1 candidates → AMBIGUOUS: fall back to first-row-as-header **and** state the uncertainty in the rendered sheet text | `SPEC.md` §22.2 | *specified, not built* |
 | A66 | Sheet with no identifiable header is still rendered, states what was assumed, never dropped, never raises | `SPEC.md` §22.2 | *specified, not built* |
 | A67 | No text discarded at grouping: a heading followed by another heading is carried into the next emitted section; trailing heading preserved; applies to all formats (shared code) | `SPEC.md` §22.3 | *specified, not built* |
 | A68 | After re-ingestion, each passage recorded as dropped in the 2026-09-15 diagnosis entry appears in ≥1 chunk of its file (concrete list off-repo) | `SPEC.md` §22.3, §22.7 | *specified, not built* |
@@ -189,8 +189,9 @@ reading the off-repo positive set into the repository.
 | A74 | Furniture removed by repetition only: every page of a ≥2-page doc, after digit normalisation; never single-page; no word pattern-matching | `SPEC.md` §22.5 | *specified, not built* |
 | A75 | Furniture removal never empties a page; a page's text is preserved | `SPEC.md` §22.5 | *specified, not built* |
 | A76 | All five Workspaces re-ingested in one pass from stored bytes under `data/{workspace_id}/sources/`; nothing under `data/` deleted; no re-upload | `SPEC.md` §22.6 | *specified, not built* |
-| A77 | Every `chunk_id` regenerated; an unresolved stored citation is handled by the UI without crashing; chunk-id notes treated as stale | `SPEC.md` §22.6 | *specified, not built* |
+| A77 | Every `chunk_id` regenerated; a stored citation whose `retrieved_chunk_ids` no longer resolve still renders (no crash, no silent disappearance, no silent re-point), shown from stored `display_name`/`section_title`, marked "no longer available — documents were re-ingested", not clickable, with a plain "Source no longer available" fallback; chunk-id notes treated as stale | `SPEC.md` §22.6 | *specified, not built* |
 | A78 | Manual pre-run step: copy `data/workspace_app.db` to a dated copy by hand — one copy, not a backup mechanism, not a deletion | `SPEC.md` §22.6 | *specified, not built* |
 | A79 | After re-ingestion the off-repo positive set still passes ≥14/15 judged on locating phrases (ids change), and the previously misdirected citation now resolves to a chunk containing the answer | `SPEC.md` §22.7 | *specified, not built (hand-run)* |
 | A80 | The spreadsheet that rendered 45 rows against a true 42 reports the true data-row count | `SPEC.md` §22.2, §22.7 | *specified, not built* |
 | A81 | §22 is ingestion-only: no OCR, no vision handling (F8), no layout-aware parser, no retrieval/prompt/chunk-size change, no oversized-splitting, no new synthetic docs | `SPEC.md` §22.8 | *specified, not built* |
+| A82 | Re-ingestion pass is a script at `scripts/reingest_all.py` — a tool, not a test (not under `tests/`, not collected by `pytest`, asserts nothing) — run by the owner from his terminal with the venv active; prints document + chunk counts per Workspace before and after; reads original bytes under `data/{workspace_id}/sources/`; deletes nothing under `data/` | `SPEC.md` §22.6 | *specified, not built* |
