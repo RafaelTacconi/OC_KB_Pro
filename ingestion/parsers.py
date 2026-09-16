@@ -231,18 +231,32 @@ def _group_unstructured_elements(elements) -> list[ParsedSection]:
     most recent heading. Heading detection is by SHAPE (`_looks_like_heading`),
     not by element type alone — see issue #1: PDF `partition_pdf` labels body
     sentence fragments as `Title` while the real numbered headings arrive as
-    `ListItem`. Elements before the first heading are grouped under
-    section_title=None.
+    `ListItem`.
+
+    SPEC §22.3 (Item 2) — NO TEXT IS DISCARDED AT GROUPING. A heading immediately
+    followed by another heading (or a trailing heading at end of document) has no
+    body of its own, so its text is CARRIED into the body of the next section
+    that is emitted; a trailing heading becomes a body-only section. Previously
+    the `if current_texts:` guard dropped such headings together with their text.
     """
     sections: list[ParsedSection] = []
     current_title: str | None = None
     current_texts: list[str] = []
+    carried: list[str] = []
 
     def flush():
+        nonlocal current_title, current_texts, carried
         if current_texts:
+            body = carried + current_texts
             sections.append(
-                ParsedSection(section_title=current_title, text="\n\n".join(current_texts))
+                ParsedSection(section_title=current_title, text="\n\n".join(body))
             )
+            carried = []
+        elif current_title is not None:
+            # A heading with no body: keep its text, never discard it.
+            carried.append(current_title)
+        current_title = None
+        current_texts = []
 
     for el in elements:
         el_type = type(el).__name__
@@ -252,10 +266,14 @@ def _group_unstructured_elements(elements) -> list[ParsedSection]:
         if _looks_like_heading(el_type, el_text):
             flush()
             current_title = el_text
-            current_texts = []
         else:
             current_texts.append(el_text)
+
     flush()
+    # A trailing heading (end of document) has no following section to carry
+    # into, so it is preserved as a body-only section.
+    if carried:
+        sections.append(ParsedSection(section_title=None, text="\n\n".join(carried)))
 
     return sections
 

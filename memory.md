@@ -1136,3 +1136,27 @@ file), the abstract-reference alternative, the off-repo companions
 history **changes every commit hash from that point forward**, breaking **every hash recorded in
 the journal**, for a **low-severity exposure of anonymised fragments**.
 Authority: **Answered by project owner on 2026-09-16.**
+
+### 2026-09-16 — §22.3 (Item 2) built and committed (A67); §22.2 (Item 1) BLOCKED — confident-header rule withdrawn
+**Built: §22.3 "no text is ever discarded at grouping"** in
+`ingestion/parsers.py::_group_unstructured_elements`. A heading with no body of its own
+(immediately followed by another heading, or trailing at end of document) is now **carried into the
+body of the next emitted section**; a trailing heading becomes a body-only section. Previously the
+`if current_texts:` guard dropped such headings together with their text. **This discharges A67** on
+the code path; the end-to-end content-recovery criterion (**A68**) still requires the re-ingestion
+pass and is **not proven here**. No retrieval/prompt change; no re-ingestion; nothing under `data/`
+touched. New tests: `tests/test_grouping_no_text_loss.py` (5) unit-testing the grouping on synthetic
+element lists. Suite: **94 → 99 passed**.
+
+**BLOCKER — §22.2 (Item 1) was NOT built; the confident-header rule is WITHDRAWN.** Implemented
+exactly as written, the rule ("CONFIDENT iff EXACTLY ONE row among the first 10 has the sheet's MAX
+non-empty-cell count") **cannot identify a header on any real sheet**, because a header row and its
+data rows **tie on non-empty-cell count**. Read-only width scan of the ingested spreadsheets
+(**reported by sheet shape only**): every sheet read AMBIGUOUS; a typical shape is widths
+`[1, 1, 0, N, N, N, …]` with `MAX = N` and **many** candidates in the first 10; one sheet had
+**zero** candidates in the first 10. A title-block sheet therefore falls back to first-row-as-header
+and renders the **title** as the header, counting the rows above the real header as data — i.e. the
+original defect, unchanged. **I refused to invent a replacement rule or to write a test asserting a
+behaviour the written rule cannot produce**, and stopped for the owner. Owner decision (2026-09-16):
+the rule is **withdrawn and replaced** in §22.2/A64/A65 (separate amendment).
+Authority: **Answered by project owner on 2026-09-16.**

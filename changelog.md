@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-16 — Build §22.3 (Item 2): no text discarded at grouping (A67) + 5 tests; Item 1 xlsx blocked (rule withdrawn, amended separately)
+
+---
+
 ## 2026-09-16 — Process: earlier journal entries exposed real corpus fragments in this public repo — forward-only fix; AGENTS.md hard rule 8 added; history rewriting rejected (no code change)
 
 ---
