@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import time
 
-from db import get_connection
+from db import chunk_pages, get_connection
 from models.registry import DEFAULT_MODEL_ID, list_models, provider_model_name
 from models.router import call_model
 from prompting.assemble import build_prompt
@@ -105,11 +105,15 @@ def answer_question(
     metrics["chunks_retrieved"] = len(chunks)
     metrics["lexical_degrade"] = degraded
 
+    # SPEC §22.4 / A72: PDF sources carry the stored page number; formats that do
+    # not support a page (DOCX/XLSX) — and pre-re-ingestion rows — stay null.
+    # The page is read here, not in retrieval/, so no retrieval query changes.
+    pages = chunk_pages([c["chunk_id"] for c in chunks])
     sources = [
         {
             "document": c.get("display_name"),
             "section": c.get("section_title"),
-            "page": None,
+            "page": pages.get(c["chunk_id"]),
         }
         for c in chunks
     ]

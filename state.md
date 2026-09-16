@@ -4,14 +4,14 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-16 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); positive set run 15 bare questions → 14 correct / 1 refusal, so the earlier over-refusal entry is CORRECTED to 1/15 (an OPEN JUDGEMENT CALL, not a proven defect); PDF section titles confirmed misleading in citations; **PDF chunk titles/bodies found MISALIGNED (citation can point at a chunk lacking the content); March 2026 date verified grounded, enquiry closed; PDF misalignment mechanism identified and a NEW cross-format silent heading-loss defect measured (DOCX labels, PDF content; synthetic corpus cannot detect it); ingestion bundle REVISED to four items (PDF → page-number labelling, layout-aware parse rejected); Tier 1 verified live on the UI (two refusals logged `answered` — §19.6); §22.2 rule withdrawn and replaced (first-candidate + text guard); **§22 Items 1 and 2 BUILT (A64–A67 on the code path; 7 + 5 new tests); stage 2 pending; nothing else approved to build**.
+**Last updated:** 2026-09-16 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); positive set run 15 bare questions → 14 correct / 1 refusal, so the earlier over-refusal entry is CORRECTED to 1/15 (an OPEN JUDGEMENT CALL, not a proven defect); PDF section titles confirmed misleading in citations; **PDF chunk titles/bodies found MISALIGNED (citation can point at a chunk lacking the content); March 2026 date verified grounded, enquiry closed; PDF misalignment mechanism identified and a NEW cross-format silent heading-loss defect measured (DOCX labels, PDF content; synthetic corpus cannot detect it); ingestion bundle REVISED to four items (PDF → page-number labelling, layout-aware parse rejected); Tier 1 verified live on the UI (two refusals logged `answered` — §19.6); §22.2 rule withdrawn and replaced (first-candidate + text guard); **§22 bundle FULLY BUILT (Items 1–4; A64–A67, A69–A75, A77, A82 on the code path; 7 + 5 + 16 new tests); the owner's single re-ingestion pass + four hand checks discharge A68/A76/A79/A80; nothing else approved to build**.
 
 ---
 
 ## Where the project stands
 
 **Implemented and green (Steps 1–7 + SPEC §14/§15/§16 + §7.14/§18 + §19.6/§20.9–§20.13).** The full
-suite passes from a clean clone: `python -m pytest tests/ -q` → **106 passed**. Acceptance matrix for
+suite passes from a clean clone: `python -m pytest tests/ -q` → **122 passed**. Acceptance matrix for
 **A1–A63** is in `ACCEPTANCE_MATRIX.md`. Recent additions: §15
 embedded-image visibility + no-model send block (A26–A28); the post-test fixes §7.10–§7.14
 (A29–A32, A36); §16 message timestamps + Markdown chat export (A33–A34); §9.3 second CLI argument
@@ -129,7 +129,7 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 
 ```
 python -m pytest tests/ -q
-106 passed   (2026-09-16)
+122 passed   (2026-09-16)
 ```
 Known flake (see memory.md): `test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
 failed once under a slow (68s) run, passes in isolation; suspected timeout, not
@@ -140,18 +140,21 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Build stage 2 of the §22 bundle** — §22.4 (PDF page-number labelling + page capture and the
-`chunks` migration), §22.5 (page furniture, repetition-based), and §22.6 (stale-citation UI handling
-+ the `scripts/reingest_all.py` re-ingestion script — a **tool, not a test**). **Item 1 (§22.2,
-xlsx header detection) and Item 2 (§22.3, no text discarded at grouping) are built** (A64–A67 on the
-code path). **Then the owner runs the single re-ingestion pass** across all five Workspaces, from
-the stored bytes under `data/{workspace_id}/sources/`, after making the one hand-made dated copy of
-`data/workspace_app.db` — nothing under `data/` is deleted. The off-repo positive set is the
-before/after acceptance check; **A68 and A80 cannot be proven until after that pass.** No retrieval
-or prompt changes. Also still open: **PC-01
-DECIDED 2026-09-15 as correct §18 strictness; the SOP wording is amended AFTER the ingestion
-bundle ships and is re-verified.** And the **OPEN-16** re-run at scale — **OPEN-16 still
-unanswered.**
+**Owner: run the single re-ingestion pass, then the acceptance checks (SPEC §22.6–§22.7).**
+1. Take the **manual, hand-made dated copy** of the database (one copy; not a backup mechanism, not
+   a deletion), from the repository root with the venv active:
+   `Copy-Item data\workspace_app.db "data\workspace_app_YYYY-MM-DD.pre-reingest.db"`
+2. Run the pass **once**, from the repository root with the venv active:
+   `python -m scripts.reingest_all`
+   It reads the stored bytes under `data/{workspace_id}/sources/`, deletes nothing under `data/`,
+   and prints per-Workspace document and chunk counts before and after.
+3. Run the **four acceptance checks by hand**: the off-repo positive set (≥14/15 on locating
+   phrases, plus the corrected citation); dropped-passage recovery; the true row count (42, not
+   45). **These are what discharge A68, A76, A79 and A80 — they cannot be proven before the pass.**
+   Builds complete: §22 Items 1–4 (A64–A67, A69–A75, A77, A82 on the code path). No retrieval or
+   prompt changes. Also still open: **PC-01 DECIDED 2026-09-15 as correct §18 strictness; the SOP
+   wording is amended AFTER the ingestion bundle ships and is re-verified.** And the **OPEN-16**
+   re-run at scale — **OPEN-16 still unanswered.**
 
 Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
 was built; correct anything you disagree with. **The xlsx row-count fix stays

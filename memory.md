@@ -1215,3 +1215,41 @@ New tests: `tests/test_xlsx_header_detection.py` (7), self-built `.xlsx` under t
 corpus document and no real corpus content** (AGENTS.md rule 8). Suite: **99 → 106 passed**. No
 re-ingestion; nothing under `data/` touched; no `[OPEN]` item resolved; no retrieval/prompt change.
 Authority: **Answered by project owner on 2026-09-16.**
+
+### 2026-09-16 — §22 stage 2 built: PDF page numbers + migration, page furniture, stale citations, re-ingestion script (NOT run)
+**Built (SPEC §22.4, §22.5, §22.6). Code only — the script was NOT run and no re-ingestion happened.**
+- **§22.4 — PDF page numbers.** `ParsedSection` gained `page`; `parse_pdf` now groups the
+  `unstructured` element stream **by page number** (`_pdf_sections_by_page`) and emits one section
+  per page with **`section_title=None`** — no PDF title is inferred; the pypdf fallback does the
+  same. `chunks` gained a nullable `page` column (SCHEMA) with an **idempotent §4.5-style
+  `migrate_db()` ALTER**; `chunk_text()` carries `page` onto every chunk and `pipeline` inserts it.
+  DOCX keeps Word-heading titles, XLSX keeps `sheet_name`, both with `page=NULL`. The **API
+  `sources.page`** is populated for PDFs via a read-only `db.chunk_pages()` lookup, so
+  **`retrieval/` is untouched** and **A59 is unchanged**; the **PDF citation chip** shows `Page N`
+  (DOCX shows its section). **A69, A70, A71, A72, A73 discharged on the code path.**
+- **§22.5 — page furniture, by repetition only.** `_remove_page_furniture()` removes a line **only
+  if it appears on EVERY page** of a document of **≥2 pages**, after **digit normalisation**; no
+  word pattern-matching; **never on a single-page document**; if removal would empty a page the
+  furniture is **RETAINED for that page**. **A74, A75 discharged.**
+- **§22.6 — stale citations.** `ui/cards.py::chips_html` gained `stale=`; `ui/chat_view.py::
+  _stored_citations_stale` checks the stored `retrieved_chunk_ids` against the current index. A
+  stale set **still renders** from the stored `display_name`/`section_title`, is marked **"no
+  longer available because the documents were re-ingested"**, is **not clickable**, never silently
+  disappears or re-points, and falls back to **"Source no longer available"** when the record
+  cannot identify a source. **A77 discharged.**
+- **§22.6 — re-ingestion script.** `scripts/reingest_all.py` — a **tool, not a test** (not under
+  `tests/`, not collected, asserts nothing), imports cleanly without executing, reads the original
+  bytes under `data/{workspace_id}/sources/`, deletes nothing under `data/`, and prints per
+  Workspace the document and chunk counts **before and after**. `ingestion/pipeline.py` gained
+  `clear_source_chunks()` and `reingest_source()`. **A82 discharged. The script was NOT run; no
+  re-ingestion happened; `data/` was not touched.**
+
+**NOT provable until the owner's single pass (do not claim):** **A68** (dropped-passage recovery),
+**A76** (all five Workspaces re-ingested from stored bytes with nothing under `data/` deleted),
+**A79** (positive set ≥14/15 on locating phrases + the corrected citation), **A80** (the
+spreadsheet reports the true 42, not 45).
+
+Tests: `tests/test_ingestion_bundle_stage2.py` (16), purpose-built inputs under tmp_path, **no real
+corpus document and no real corpus content** (AGENTS.md rule 8). Suite: **106 → 122 passed**. No
+retrieval/prompt change; no `[OPEN]` item resolved.
+Authority: **Answered by project owner on 2026-09-16.**

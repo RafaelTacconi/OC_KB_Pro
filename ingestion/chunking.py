@@ -26,6 +26,7 @@ __all__ = ["WORDS_TO_TOKENS", "estimate_tokens", "chunk_text", "build_embedding_
 def chunk_text(
     text: str,
     section_title: str | None = None,
+    page: int | None = None,
     target_tokens: int = 400,
 ) -> list[dict]:
     """
@@ -33,7 +34,10 @@ def chunk_text(
     accumulates them until adding the next paragraph would exceed
     target_tokens, then starts a new chunk. No overlap between chunks.
 
-    Returns a list of dicts: {text, section_title, token_count}
+    `page` (SPEC §22.4) is the source page number for PDF sections; it is
+    carried onto every chunk of the section, and is None for DOCX/XLSX.
+
+    Returns a list of dicts: {text, section_title, page, token_count}
     """
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     chunks: list[dict] = []
@@ -43,22 +47,28 @@ def chunk_text(
     for para in paragraphs:
         para_tokens = len(para.split()) * WORDS_TO_TOKENS
         if current_tokens + para_tokens > target_tokens and current:
-            chunks.append(_finalize(current, section_title, current_tokens))
+            chunks.append(_finalize(current, section_title, page, current_tokens))
             current = []
             current_tokens = 0.0
         current.append(para)
         current_tokens += para_tokens
 
     if current:
-        chunks.append(_finalize(current, section_title, current_tokens))
+        chunks.append(_finalize(current, section_title, page, current_tokens))
 
     return chunks
 
 
-def _finalize(paragraphs: list[str], section_title: str | None, token_count: float) -> dict:
+def _finalize(
+    paragraphs: list[str],
+    section_title: str | None,
+    page: int | None,
+    token_count: float,
+) -> dict:
     return {
         "text": "\n\n".join(paragraphs),
         "section_title": section_title,
+        "page": page,
         "token_count": int(token_count),
     }
 

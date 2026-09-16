@@ -60,7 +60,11 @@ def ingest_source(file_path: str, source_type: str, source_id: str, workspace_id
         all_chunks: list[dict] = []
         for section in sections:
             all_chunks.extend(
-                chunk_text(section.text, section_title=section.section_title)
+                chunk_text(
+                    section.text,
+                    section_title=section.section_title,
+                    page=section.page,
+                )
             )
 
         if not all_chunks:
@@ -75,15 +79,16 @@ def ingest_source(file_path: str, source_type: str, source_id: str, workspace_id
                 conn.execute(
                     """
                     INSERT INTO chunks
-                        (chunk_id, source_id, workspace_id, section_title,
+                        (chunk_id, source_id, workspace_id, section_title, page,
                          text, embedding_text, embedding, token_count, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         chunk_id,
                         source_id,
                         workspace_id,
                         chunk["section_title"],
+                        chunk.get("page"),
                         chunk["text"],
                         emb_text,
                         emb_blob,
@@ -130,6 +135,35 @@ def delete_source(source_id: str) -> None:
 
         conn.execute("DELETE FROM chunks WHERE source_id = ?", (source_id,))
         conn.execute("DELETE FROM sources WHERE source_id = ?", (source_id,))
+
+
+def clear_source_chunks(source_id: str) -> None:
+    """
+    Delete a source's chunks and their FTS index rows, KEEPING the sources row.
+    Used by the §22.6 re-ingestion pass: re-ingestion replaces a source's
+    chunks, so the old ones must go first. Preserves the same FTS-before-chunks
+    ordering as delete_source() (SPEC §7.7).
+    """
+    with transaction() as conn:
+        rows = conn.execute(
+            "SELECT rowid FROM chunks WHERE source_id = ?", (source_id,)
+        ).fetchall()
+        for row in rows:
+            conn.execute("DELETE FROM chunks_fts WHERE rowid = ?", (row["rowid"],))
+        conn.execute("DELETE FROM chunks WHERE source_id = ?", (source_id,))
+
+
+def reingest_source(
+    file_path: str, source_type: str, source_id: str, workspace_id: str
+) -> None:
+    """
+    SPEC §22.6: replace one source's index from its already-stored bytes. Clears
+    the source's existing chunks (keeping the sources row and its identity),
+    then runs ingest_source() afresh. It reads the given file path and does not
+    touch anything else under data/.
+    """
+    clear_source_chunks(source_id)
+    ingest_source(file_path, source_type, source_id, workspace_id)
 
 
 def _set_status(source_id: str, status: str, error_message: str | None = None) -> None:

@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     source_id       TEXT NOT NULL REFERENCES sources(source_id),
     workspace_id    TEXT NOT NULL REFERENCES workspaces(workspace_id),
     section_title   TEXT,
+    page            INTEGER,        -- source page number (PDFs; SPEC §22.4)
     text            TEXT NOT NULL,
     embedding_text  TEXT,
     embedding       BLOB,
@@ -189,6 +190,13 @@ def migrate_db(db_path: str | Path = DB_PATH) -> None:
         if "image_count" not in source_cols:
             conn.execute("ALTER TABLE sources ADD COLUMN image_count INTEGER")
 
+        # 5. chunks.page (SPEC §22.4) — nullable; NULL means "no page recorded",
+        #    which is true for every existing (pre-re-ingestion) row and for
+        #    DOCX/XLSX chunks.
+        chunk_cols = [r["name"] for r in conn.execute("PRAGMA table_info(chunks)")]
+        if "page" not in chunk_cols:
+            conn.execute("ALTER TABLE chunks ADD COLUMN page INTEGER")
+
         # 4. Indexes (AFTER the ALTERs — they reference chat_id).
         conn.executescript(INDEXES)
 
@@ -221,6 +229,36 @@ def migrate_db(db_path: str | Path = DB_PATH) -> None:
             )
 
         conn.commit()
+    finally:
+        conn.close()
+
+
+def chunk_pages(chunk_ids: list[str], db_path: str | Path = DB_PATH) -> dict[str, int | None]:
+    """
+    Read-only: map chunk_id -> stored page number, for the chunks that exist.
+    A chunk_id absent from the returned map does not exist in the current index
+    — a stale citation (SPEC §22.6). `page` is None for DOCX/XLSX chunks and for
+    pre-re-ingestion PDF rows. Keeps `retrieval/` untouched: callers enrich the
+    chunks returned by hybrid_search with this lookup instead of changing any
+    retrieval query.
+
+    If the `page` column does not exist yet (an un-migrated DB), returns an
+    empty map rather than raising.
+    """
+    ids = [c for c in chunk_ids if c]
+    if not ids:
+        return {}
+    conn = get_connection(db_path)
+    try:
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(chunks)")]
+        if "page" not in cols:
+            return {}
+        placeholders = ",".join("?" for _ in ids)
+        rows = conn.execute(
+            f"SELECT chunk_id, page FROM chunks WHERE chunk_id IN ({placeholders})",
+            ids,
+        ).fetchall()
+        return {r["chunk_id"]: r["page"] for r in rows}
     finally:
         conn.close()
 

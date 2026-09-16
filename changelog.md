@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-16 — Build §22 stage 2: PDF page numbers + `chunks.page` migration (A69–A73), repetition-based furniture (A74/A75), stale-citation UI (A77), re-ingestion tool `scripts/reingest_all.py` (A82) + 16 tests
+
+---
+
 ## 2026-09-16 — Build §22.2 (Item 1): xlsx header detection against the amended rule (A64/A65/A66) + 7 tests; restore grouping docstring line
 
 ---

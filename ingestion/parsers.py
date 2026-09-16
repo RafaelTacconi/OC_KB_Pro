@@ -54,6 +54,7 @@ def _looks_like_heading(el_type: str, text: str) -> bool:
 class ParsedSection:
     section_title: str | None
     text: str
+    page: int | None = None  # source page number; PDFs only (SPEC §22.4)
 
 
 def count_embedded_images(file_path: str, source_type: str) -> int:
@@ -123,30 +124,102 @@ def _count_images_docx(file_path: str) -> int:
             return 0
 
 
+def _normalise_furniture_line(line: str) -> str:
+    """
+    Normalise a line for furniture comparison (SPEC §22.5): collapse whitespace
+    and replace digit runs with '#', so lines differing only by a page number
+    compare equal.
+    """
+    return re.sub(r"\d+", "#", " ".join(line.split()))
+
+
+def _remove_page_furniture(pages_lines: dict[int, list[str]]) -> dict[int, list[str]]:
+    """
+    SPEC §22.5 — page furniture, by repetition only.
+
+    A line is removed **only if it appears on EVERY page** of a document of
+    **two or more pages**, after digit normalisation. Repetition across pages is
+    the evidence; there is **no** word pattern-matching. **Never applied to a
+    single-page document.** If removal would empty a page entirely, the
+    furniture is **RETAINED for that page** so no page's text is discarded.
+    """
+    if len(pages_lines) < 2:
+        return pages_lines
+    all_pages = set(pages_lines)
+    line_pages: dict[str, set[int]] = {}
+    for page, lines in pages_lines.items():
+        for line in lines:
+            key = _normalise_furniture_line(line)
+            if key:
+                line_pages.setdefault(key, set()).add(page)
+    furniture = {key for key, pages in line_pages.items() if pages >= all_pages}
+    if not furniture:
+        return pages_lines
+    result: dict[int, list[str]] = {}
+    for page, lines in pages_lines.items():
+        kept = [ln for ln in lines if _normalise_furniture_line(ln) not in furniture]
+        if not any(ln.strip() for ln in kept):
+            kept = list(lines)  # would empty the page → retain its furniture
+        result[page] = kept
+    return result
+
+
+def _pdf_sections_by_page(elements) -> list[ParsedSection]:
+    """
+    Group PDF elements by their page number and emit one page-labelled section
+    per page, after furniture removal (SPEC §22.4, §22.5). No section title is
+    inferred for a PDF.
+    """
+    pages_lines: dict[int, list[str]] = {}
+    for el in elements:
+        text = str(el).strip()
+        if not text:
+            continue
+        page = getattr(getattr(el, "metadata", None), "page_number", None) or 1
+        pages_lines.setdefault(page, []).append(text)
+    pages_lines = _remove_page_furniture(pages_lines)
+    sections: list[ParsedSection] = []
+    for page in sorted(pages_lines):
+        body = "\n\n".join(pages_lines[page])
+        if body.strip():
+            sections.append(ParsedSection(section_title=None, page=page, text=body))
+    return sections
+
+
 def parse_pdf(file_path: str) -> list[ParsedSection]:
     """
-    Try `unstructured`'s partition_pdf first (layout-aware: detects
-    headings/sections). Falls back to pypdf (text-layer only, one
+    SPEC §22.4 (Item 3): PDFs are labelled by PAGE NUMBER, not by inferred
+    section titles. The element list is flat and a multi-column layout
+    interleaves it, so an inferred heading can be paired with the wrong body; a
+    page number is a checkable fact, an inferred section title is a claim that
+    can be wrong. Elements are grouped by page number and repeated page
+    furniture is removed (§22.5). Falls back to pypdf (text layer only, one
     section per page) if unstructured is unavailable or errors.
     """
     try:
         from unstructured.partition.pdf import partition_pdf
 
         elements = partition_pdf(filename=file_path)
-        return _group_unstructured_elements(elements)
     except Exception:
         return _parse_pdf_fallback(file_path)
+    return _pdf_sections_by_page(elements)
 
 
 def _parse_pdf_fallback(file_path: str) -> list[ParsedSection]:
     from pypdf import PdfReader
 
     reader = PdfReader(file_path)
-    sections = []
+    pages_lines: dict[int, list[str]] = {}
     for i, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
         if text.strip():
-            sections.append(ParsedSection(section_title=f"Page {i}", text=text.strip()))
+            pages_lines[i] = [ln for ln in text.splitlines() if ln.strip()]
+    pages_lines = _remove_page_furniture(pages_lines)
+    sections: list[ParsedSection] = []
+    for page in sorted(pages_lines):
+        body = "\n\n".join(pages_lines[page])
+        if body.strip():
+            sections.append(ParsedSection(section_title=None, page=page, text=body))
     return sections
 
 

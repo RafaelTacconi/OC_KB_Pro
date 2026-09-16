@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 import streamlit as st
 
 from activity_log import log_turn
-from db import transaction
+from db import chunk_pages, transaction
 from models.registry import DEFAULT_MODEL_ID, get_model_spec, list_models, provider_model_name
 from models.router import call_model
 from prompting.assemble import build_prompt
@@ -281,11 +281,13 @@ def _run_turn(
         )
         raise
 
+    pages = chunk_pages([c["chunk_id"] for c in chunks])
     cited_sources = [
         {
             "source_id": c["source_id"],
             "display_name": c["display_name"],
             "section_title": c.get("section_title"),
+            "page": pages.get(c["chunk_id"]),
         }
         for c in chunks
     ]
@@ -330,15 +332,47 @@ def _stash_error(workspace_id: str, user_id: str, chat_id: str, user_input: str,
     }
 
 
-def _render_answer_body(answer_text: str, cited_sources: list[dict], model_id: str) -> None:
+def _render_answer_body(
+    answer_text: str,
+    cited_sources: list[dict],
+    model_id: str,
+    stale: bool = False,
+) -> None:
     """The body of an assistant bubble: answer text, retrieved-source chips,
     and model attribution. Shared by the inline send render and (for the same
-    visual result) the history render."""
+    visual result) the history render.
+
+    `stale` (SPEC §22.6 / A77) marks a stored citation whose chunk ids no longer
+    resolve because the documents were re-ingested — the sources still render,
+    from the identifying information actually stored, marked as no longer
+    available and not clickable.
+    """
     st.write(answer_text)
     if cited_sources:
-        source_chips(cited_sources, heading="Retrieved from")
+        source_chips(cited_sources, heading="Retrieved from", stale=stale)
     if model_id:
         st.caption(f"Model: {_model_display_name(model_id)}")
+
+
+def _stored_citations_stale(retrieved_chunk_ids_json: str | None) -> bool:
+    """
+    SPEC §22.6: a stored assistant message is stale when its stored chunk ids no
+    longer all resolve in the current `chunks` table (i.e. the documents were
+    re-ingested and the ids were regenerated). Read-only; never raises.
+    """
+    if not retrieved_chunk_ids_json:
+        return False
+    try:
+        ids = json.loads(retrieved_chunk_ids_json)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(ids, list) or not ids:
+        return False
+    try:
+        found = chunk_pages(ids)
+    except Exception:  # noqa: BLE001 - a stale check must never break rendering
+        return False
+    return any(i not in found for i in ids)
 
 
 def _answer(
@@ -745,7 +779,8 @@ def render_chat_view(workspace_id: str, user_id: str) -> None:
         with st.chat_message(msg["role"]):
             if msg["role"] == "assistant":
                 cited = json.loads(msg["cited_sources"]) if msg.get("cited_sources") else []
-                _render_answer_body(msg["content"], cited, msg.get("model_id"))
+                stale = _stored_citations_stale(msg.get("retrieved_chunk_ids"))
+                _render_answer_body(msg["content"], cited, msg.get("model_id"), stale=stale)
             else:
                 st.write(msg["content"])
             # SPEC §16.1 — timestamp, displayed in LOCAL time (stored UTC).
