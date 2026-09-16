@@ -1,4 +1,4 @@
-# Acceptance matrix — A1–A63
+# Acceptance matrix — A1–A81
 
 Verified 2026-09-15 against current `main`. Method: each criterion is mapped to
 the test(s) or code that prove it, or is marked *not verifiable* / *specified, not
@@ -166,3 +166,31 @@ behaviour in `SPEC.md` §20.
 |---|---|---|---|
 | A18 | `memory.md`/`state.md`/`changelog.md` exist at repo root and are current | Inspection: every step's entry present in each; `state.md` names the current step + a concrete next action; `changelog.md` has an entry per completed step | ✅ |
 | A19 | No `[OPEN]` recorded as resolved on agent authority | `memory.md` Decision log: every `[OPEN]` entry uses one of the three permitted Authority values; the two agent-decided items (Steps 3+4 landing, degrade-persistence) are recorded as owner-delegated, not owner-answered | ✅ |
+
+## Ingestion fix bundle (SPEC §22) — specified 2026-09-15/16, NOT built
+
+All rows below are **specification only**. Nothing is built; proof is the specified
+behaviour in `SPEC.md` §22. No retrieval or prompt behaviour changes. A64–A81 are
+checkable by a person reading the screen or a rendered file; **none** depends on
+reading the off-repo positive set into the repository.
+
+| # | Criterion | Proof | Status |
+|---|---|---|---|
+| A64 | `parse_xlsx` identifies the real header row, counts only data rows after it, renders a 1-based row-number column; count visible/checkable | `SPEC.md` §22.2 | *specified, not built* |
+| A65 | Ambiguous header → fall back to first-row-as-header **and** state the uncertainty in the rendered sheet text | `SPEC.md` §22.2 | *specified, not built* |
+| A66 | Sheet with no identifiable header is still rendered, states what was assumed, never dropped, never raises | `SPEC.md` §22.2 | *specified, not built* |
+| A67 | No text discarded at grouping: a heading followed by another heading is carried into the next emitted section; trailing heading preserved; applies to all formats (shared code) | `SPEC.md` §22.3 | *specified, not built* |
+| A68 | After re-ingestion, each passage recorded as dropped in the 2026-09-15 diagnosis entry appears in ≥1 chunk of its file (concrete list off-repo) | `SPEC.md` §22.3, §22.7 | *specified, not built* |
+| A69 | PDF chunks labelled by PAGE NUMBER; no inferred PDF section title | `SPEC.md` §22.4 | *specified, not built* |
+| A70 | DOCX keeps real Word-heading titles; XLSX keeps `sheet_name`; page rule is PDF-only | `SPEC.md` §22.4 | *specified, not built* |
+| A71 | `chunks` gains a page column via idempotent §4.5-style migration; existing rows have no page until re-ingested | `SPEC.md` §22.4 | *specified, not built* |
+| A72 | API `sources.page` populated for PDFs; still `null` for formats that do not support a page (A59 unchanged for those) | `SPEC.md` §22.4 | *specified, not built* |
+| A73 | PDF citation chip displays the stored page number (`Page N`), not an inferred section | `SPEC.md` §22.4 | *specified, not built* |
+| A74 | Furniture removed by repetition only: every page of a ≥2-page doc, after digit normalisation; never single-page; no word pattern-matching | `SPEC.md` §22.5 | *specified, not built* |
+| A75 | Furniture removal never empties a page; a page's text is preserved | `SPEC.md` §22.5 | *specified, not built* |
+| A76 | All five Workspaces re-ingested in one pass from stored bytes under `data/{workspace_id}/sources/`; nothing under `data/` deleted; no re-upload | `SPEC.md` §22.6 | *specified, not built* |
+| A77 | Every `chunk_id` regenerated; an unresolved stored citation is handled by the UI without crashing; chunk-id notes treated as stale | `SPEC.md` §22.6 | *specified, not built* |
+| A78 | Manual pre-run step: copy `data/workspace_app.db` to a dated copy by hand — one copy, not a backup mechanism, not a deletion | `SPEC.md` §22.6 | *specified, not built* |
+| A79 | After re-ingestion the off-repo positive set still passes ≥14/15 judged on locating phrases (ids change), and the previously misdirected citation now resolves to a chunk containing the answer | `SPEC.md` §22.7 | *specified, not built (hand-run)* |
+| A80 | The spreadsheet that rendered 45 rows against a true 42 reports the true data-row count | `SPEC.md` §22.2, §22.7 | *specified, not built* |
+| A81 | §22 is ingestion-only: no OCR, no vision handling (F8), no layout-aware parser, no retrieval/prompt/chunk-size change, no oversized-splitting, no new synthetic docs | `SPEC.md` §22.8 | *specified, not built* |

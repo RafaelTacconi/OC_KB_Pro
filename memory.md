@@ -1050,3 +1050,22 @@ the ingestion bundle is built and re-verified, or PC-01's meaning changes undern
 **SUPERSEDES** the classification in the earlier entry "DEFECT: over-refusal on retrieved material"
 (2026-09-15) — referred to by title, **not edited**. No `SPEC.md` change, no prompt change, no code.
 Authority: **Answered by project owner on 2026-09-15.**
+
+### 2026-09-16 — §22 written (ingestion fix bundle); A64–A81 added; spec only, nothing built
+Wrote `SPEC.md` **§22 — Ingestion fix bundle** and acceptance criteria **A64–A81** (contiguous
+after A63; no existing section or criterion renumbered, edited, or deleted), plus the matching rows
+in `ACCEPTANCE_MATRIX.md`. **Spec only — nothing is built; the owner reviews §22 and A64–A81 and
+approves or amends; the build is a separate, later instruction.** Three owner directions are
+recorded in §22: (1) **xlsx ambiguity fallback** — when the header row cannot be determined
+confidently, fall back to first-row-as-header **and** state the uncertainty in the rendered text
+(visibly unsure beats silently wrong); (2) the **no-text-discarded invariant** at grouping
+(`parsers.py:242`) — a heading with no body is carried into the next emitted section, trailing
+headings preserved, applies to all formats; (3) the **repetition-based furniture rule** — remove a
+line only if it appears on every page of a ≥2-page document after digit normalisation, never
+single-page, no word pattern-matching. The section **merges** PDF page-number labelling with page
+capture, **rejects** a layout-aware parser (parser-specific; does **not** revive the OCR reasoning
+against F8), and records its dependencies on A29 and the OPEN items **without resolving any**. **No
+`[OPEN]` item is resolved; OPEN-15 and OPEN-16 remain unanswered.** No retrieval, prompt, or code
+change. Public-repo hygiene: no real-corpus content in `SPEC.md`; the affected passages are
+referenced to the 2026-09-15 diagnosis entry in this file, and the concrete list stays off-repo.
+Authority: **Answered by project owner on 2026-09-16.**

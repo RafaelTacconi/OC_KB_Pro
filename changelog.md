@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-16 — Spec-only: §22 Ingestion fix bundle (xlsx header detection; silent content loss; PDF page labelling + page capture; page furniture) + acceptance criteria A64–A81 and matrix rows; nothing built
+
+---
+
 ## 2026-09-15 — Docs: CORRECTION — PDF strategy inferred not observed; xlsx "header=0" is the pandas default (no argument); PC-01 decided as correct §18 strictness, not a defect (no code change)
 
 ---

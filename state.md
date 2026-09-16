@@ -140,18 +140,11 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Spec the revised four-item ingestion bundle (spec first, then build).** Consolidate and specify,
-before any build: (1) **xlsx header detection** (`parse_xlsx` `header=0` bug, owner's two prior
-reservations stand); (2) **silent heading loss** (`parsers.py:242` — a heading immediately followed
-by another heading is discarded; **ALL formats** via the shared grouping code; contained, layout-
-independent); (3) **PDF section labelling + page-number capture, MERGED** — owner direction: **stop
-inferring PDF section titles, label PDF chunks by page number** (a page number is a checkable fact;
-a layout-aware parse is REJECTED — heavy native Windows deps; that rejection is parser-specific and
-does **not** revive the OCR reasoning against the vision route F8); (4) **page furniture** — footer
-bleed in chunk text AND running headers passing the heading test. **All four ship in ONE
-re-ingestion pass, across ALL FIVE Workspaces**; `GROUNDING_REGRESSION_POSITIVE.md` is the
-**before/after acceptance check**. **Nothing is approved to build yet — spec first; do not change
-retrieval settings, prompts, or `SPEC.md`.** Also still open: **PC-01
+**Owner reviews `SPEC.md` §22 and criteria A64–A81, then approves or amends.** The build is **not
+approved** until the owner says so; if approved it is a separate, later instruction, and all four
+items ship in **one re-ingestion pass across all five Workspaces** with the off-repo positive set
+as the before/after acceptance check. **Nothing is built; no retrieval, prompt, or code changed.**
+Also still open: **PC-01
 DECIDED 2026-09-15 as correct §18 strictness; the SOP wording is amended AFTER the ingestion
 bundle ships and is re-verified.** And the **OPEN-16** re-run at scale — **OPEN-16 still
 unanswered.**
