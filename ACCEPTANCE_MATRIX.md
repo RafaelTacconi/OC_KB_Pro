@@ -176,8 +176,8 @@ reading the off-repo positive set into the repository.
 
 | # | Criterion | Proof | Status |
 |---|---|---|---|
-| A64 | `parse_xlsx` applies the §22.2 rule (MAX non-empty cells; candidate among first 10 rows with MAX; confident iff exactly one candidate), counts only data rows after the confident header, renders a 1-based row-number column; count visible/checkable | `SPEC.md` §22.2 | *specified, not built* |
-| A65 | Zero or >1 candidates → AMBIGUOUS: fall back to first-row-as-header **and** state the uncertainty in the rendered sheet text | `SPEC.md` §22.2 | *specified, not built* |
+| A64 | `parse_xlsx` applies the §22.2 rule (MAX non-empty cells; candidate among first 10 with MAX; provisional header = FIRST/topmost candidate; CONFIDENT only if every non-empty cell in it is text — no number/date; zero candidates = AMBIGUOUS), counts only data rows after the confident header, renders a 1-based row-number column; count visible/checkable | `SPEC.md` §22.2 | *specified, not built* |
+| A65 | AMBIGUOUS (zero candidates, or the topmost candidate's row contains a number/date) → fall back to first-row-as-header **and** state the uncertainty in the rendered sheet text | `SPEC.md` §22.2 | *specified, not built* |
 | A66 | Sheet with no identifiable header is still rendered, states what was assumed, never dropped, never raises | `SPEC.md` §22.2 | *specified, not built* |
 | A67 | No text discarded at grouping: a heading followed by another heading is carried into the next emitted section; trailing heading preserved; applies to all formats (shared code) | `SPEC.md` §22.3 | *specified, not built* |
 | A68 | After re-ingestion, each passage recorded as dropped in the 2026-09-15 diagnosis entry appears in ≥1 chunk of its file (concrete list off-repo) | `SPEC.md` §22.3, §22.7 | *specified, not built* |

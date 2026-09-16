@@ -11,7 +11,7 @@ steps an implementing agent can complete are done; what remains needs you.
 ## Where the project stands
 
 **Implemented and green (Steps 1–7 + SPEC §14/§15/§16 + §7.14/§18 + §19.6/§20.9–§20.13).** The full
-suite passes from a clean clone: `python -m pytest tests/ -q` → **93 passed**. Acceptance matrix for
+suite passes from a clean clone: `python -m pytest tests/ -q` → **99 passed**. Acceptance matrix for
 **A1–A63** is in `ACCEPTANCE_MATRIX.md`. Recent additions: §15
 embedded-image visibility + no-model send block (A26–A28); the post-test fixes §7.10–§7.14
 (A29–A32, A36); §16 message timestamps + Markdown chat export (A33–A34); §9.3 second CLI argument
@@ -129,7 +129,7 @@ While you have a live endpoint: confirm each model's real `context_window_tokens
 
 ```
 python -m pytest tests/ -q
-94 passed   (2026-09-15)
+99 passed   (2026-09-16)
 ```
 Known flake (see memory.md): `test_chat_error_handling.py::test_failed_turn_persists_question_and_retry_does_not_duplicate`
 failed once under a slow (68s) run, passes in isolation; suspected timeout, not
@@ -140,11 +140,14 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Owner reviews `SPEC.md` §22 and criteria A64–A81, then approves or amends.** The build is **not
-approved** until the owner says so; if approved it is a separate, later instruction, and all four
-items ship in **one re-ingestion pass across all five Workspaces** with the off-repo positive set
-as the before/after acceptance check. **Nothing is built; no retrieval, prompt, or code changed.**
-Also still open: **PC-01
+**Build `SPEC.md` §22.2 Item 1 (xlsx header detection) against the AMENDED rule** — the FIRST
+(topmost) candidate among the first 10 rows with MAX non-empty cells, gated by the **TEXT GUARD**
+(confident only if every non-empty cell in that row is text; zero candidates, or a number/date in
+the topmost candidate, is AMBIGUOUS → first-row-as-header with the uncertainty stated in the
+rendered text). **Item 2 (§22.3, no text discarded at grouping) is built and committed (A67).**
+No retrieval or prompt changes; no re-ingestion; nothing under `data/` deleted. The §22 ingestion
+bundle still ships in one re-ingestion pass across all five Workspaces with the off-repo positive
+set as the before/after acceptance check. Also still open: **PC-01
 DECIDED 2026-09-15 as correct §18 strictness; the SOP wording is amended AFTER the ingestion
 bundle ships and is re-verified.** And the **OPEN-16** re-run at scale — **OPEN-16 still
 unanswered.**

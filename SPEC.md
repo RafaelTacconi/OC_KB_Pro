@@ -687,8 +687,8 @@ For the new and fixed behaviour only. The v2 acceptance criteria (#1–#10) are 
 
 **Ingestion fix bundle** (§22) — specified 2026-09-15/16; **not built**. These are ingestion criteria only; none of them changes retrieval, prompting, or any retrieval constant.
 
-- A64. `parse_xlsx` does not assume physical row 1 is the header: it applies the §22.2 rule (MAX = greatest number of non-empty cells in any row; a candidate is a row among the first 10 rows with MAX non-empty cells; confident only when exactly one candidate exists), counts only the data rows after the confident header row, and renders each sheet with an explicit 1-based row-number column, so the data-row count is visible and checkable in the rendered output.
-- A65. When the §22.2 rule finds zero candidates or more than one, the header is AMBIGUOUS and the renderer falls back to the current behaviour (first row as header) **and** states the uncertainty in the rendered sheet text, so both the reader and the model can see the header row was not determined confidently.
+- A64. `parse_xlsx` does not assume physical row 1 is the header: it applies the §22.2 rule (MAX = greatest number of non-empty cells in any row; a candidate is a row among the first 10 with MAX non-empty cells; the provisional header is the FIRST/topmost candidate, CONFIDENT only if every non-empty cell in that row is text — no number, no date; zero candidates is AMBIGUOUS), counts only the data rows after the confident header row, and renders each sheet with an explicit 1-based row-number column, so the data-row count is visible and checkable in the rendered output.
+- A65. When the §22.2 rule is AMBIGUOUS — zero candidates, or the topmost candidate's provisional header row contains a number or a date — the renderer falls back to the current behaviour (first row as header) **and** states the uncertainty in the rendered sheet text, so both the reader and the model can see the header row was not determined confidently.
 - A66. A sheet with no identifiable header row is still rendered and states what was assumed; it is never dropped and ingestion never raises.
 - A67. No text is discarded at grouping: a heading not followed by body text is carried into the body of the next section that is emitted, a trailing heading at end of document is preserved, and the rule applies to every format because the grouping code is shared. No content is lost to the `if current_texts:` guard.
 - A68. After re-ingestion, each passage recorded as dropped in the 2026-09-15 diagnosis entry in `memory.md` appears in at least one chunk of the file it came from. (The concrete passage list stays off-repo.)
@@ -1598,13 +1598,30 @@ an ordinary data row.
 - Read each sheet **without assuming a header row**; identify the **real header row**; count only
   the data rows **after** it; and render the sheet with an explicit **1-based row-number column**,
   so the count is visible and checkable by reading the output.
-- **The confident-header rule, stated so it can be applied by hand.** Let **MAX** be the greatest
-  number of non-empty cells in any row of the sheet. A **candidate header row** is a row among the
-  **first 10 rows** of the sheet whose number of non-empty cells equals **MAX**. Detection is
-  **CONFIDENT if and only if there is EXACTLY ONE candidate**. That row is the header, and the data
-  rows are the rows **after** it. If there are **ZERO candidates**, or **MORE THAN ONE**, the shape
-  is **AMBIGUOUS** and the fallback below applies. A reader can apply this rule to a sheet by hand
-  and predict the outcome.
+- **The header rule (2026-09-16) — the earlier "exactly one candidate" rule is WITHDRAWN.** The
+  withdrawn rule required **exactly one** candidate row, on the reasoning that a header is uniquely
+  the widest row. That is **unsatisfiable in practice**: a header row and its data rows have the
+  **same** number of filled cells, so every real sheet produced many candidates and read as
+  AMBIGUOUS — the fix was a **no-op**. The rule is replaced by the following, written out so a person
+  can apply it to a sheet by hand and predict the result:
+  1. **MAX** is the greatest number of non-empty cells in any row of the sheet.
+  2. A **CANDIDATE** is a row among the **first 10 rows** of the sheet whose non-empty-cell count
+     equals **MAX**.
+  3. If there is at least one candidate, the **provisional header** is the **FIRST (topmost)**
+     candidate.
+  4. **TEXT GUARD — the detection is CONFIDENT only if every non-empty cell in that provisional
+     header row is TEXT** (no numeric value, no date value). If that row contains any number or date,
+     it is treated as a data row and the detection is **AMBIGUOUS**. **Only the topmost candidate is
+     tested; do NOT fall through to the next candidate.**
+  5. If there are **ZERO candidates**, the detection is **AMBIGUOUS**.
+  6. **AMBIGUOUS** means the fallback below applies unchanged: first row as header, with the
+     uncertainty stated in the rendered sheet text.
+- **Why the TEXT GUARD exists.** Without it, a header row containing a **blank cell** is **narrower**
+  than its widest data row, so the rule would skip the header and adopt the **first DATA row** —
+  **mislabelling every column and swallowing one row of data**. That is exactly the silent,
+  confident failure OWNER RESERVATION 1 names, so the guard converts it into a **visible fallback**.
+- **A sheet whose widest row falls outside the first 10 rows** yields zero candidates, so it falls
+  back and says so. **Accepted: a stated assumption beats a confident guess.**
 - **OWNER RESERVATION 1 is satisfied explicitly.** Any header-detection rule is a heuristic, and a
   heuristic that picks the **wrong** row **mislabels every column** — a worse and quieter failure
   than a wrong row count. The spec therefore defines (a) what "confident" means, in checkable

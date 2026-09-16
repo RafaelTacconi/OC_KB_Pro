@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-16 — Spec-only: §22.2 rule WITHDRAWN and replaced (first candidate + text guard); A64/A65 amended (Item 1 not built)
+
+---
+
 ## 2026-09-16 — Build §22.3 (Item 2): no text discarded at grouping (A67) + 5 tests; Item 1 xlsx blocked (rule withdrawn, amended separately)
 
 ---

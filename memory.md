@@ -1160,3 +1160,28 @@ original defect, unchanged. **I refused to invent a replacement rule or to write
 behaviour the written rule cannot produce**, and stopped for the owner. Owner decision (2026-09-16):
 the rule is **withdrawn and replaced** in §22.2/A64/A65 (separate amendment).
 Authority: **Answered by project owner on 2026-09-16.**
+
+### 2026-09-16 — §22.2 amended: "exactly one candidate" WITHDRAWN and replaced (first candidate + text guard); A64/A65 updated
+**Owner decision (2026-09-16): the §22.2 confident-header rule is WITHDRAWN and replaced.** The
+withdrawn rule required **exactly one** candidate row among the first 10 with the sheet's MAX
+non-empty-cell count. It is **unsatisfiable** in practice: a header row and its data rows have the
+**same** number of filled cells, so a title-block sheet read as AMBIGUOUS and the fix was a **no-op**
+(the real header was not found; the title was used as the header).
+
+**Replacement rule (now written out in full in §22.2):** MAX = greatest non-empty-cell count in any
+row; a CANDIDATE is a row among the first 10 with count == MAX; the provisional header is the
+**FIRST (topmost)** candidate; **TEXT GUARD** — CONFIDENT only if **every non-empty cell in that row
+is text** (no number, no date), else AMBIGUOUS (**only the topmost candidate is tested — no
+fall-through** to the next); **ZERO candidates** → AMBIGUOUS; AMBIGUOUS → the existing
+first-row-as-header fallback with the uncertainty stated in the rendered text.
+
+**Why the TEXT GUARD — recorded in the owner's voice in §22.2:** without it, a header row with a
+**blank cell** is narrower than its widest data row, so the rule would skip the header and adopt the
+**first DATA row**, **mislabelling every column and swallowing one row of data** — the silent,
+confident failure OWNER RESERVATION 1 named; the guard converts it into a **visible fallback**. A
+sheet whose widest row falls **outside the first 10** falls back and says so — **a stated assumption
+beats a confident guess.**
+
+**Spec-only; Item 1 is NOT built and NO Item 1 code was committed.** A64 and A65 amended to match;
+`ACCEPTANCE_MATRIX.md` A64/A65 rows updated; no other criterion touched; no renumbering.
+Authority: **Answered by project owner on 2026-09-16.**
