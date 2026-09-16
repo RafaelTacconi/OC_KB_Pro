@@ -1185,3 +1185,33 @@ beats a confident guess.**
 **Spec-only; Item 1 is NOT built and NO Item 1 code was committed.** A64 and A65 amended to match;
 `ACCEPTANCE_MATRIX.md` A64/A65 rows updated; no other criterion touched; no renumbering.
 Authority: **Answered by project owner on 2026-09-16.**
+
+### 2026-09-16 — §22.2 (Item 1) built against the AMENDED rule; A64/A65/A66 discharged on the code path
+**Built: xlsx header detection against the amended §22.2 rule** in `ingestion/parsers.py`
+(`_is_empty_cell`, `_cell_is_text`, `_detect_xlsx_header`, `_trimmed_width`, `_cell_text`, and a
+rewritten `parse_xlsx`). It implements exactly: MAX = greatest non-empty-cell count in any row; a
+CANDIDATE = a row among the first 10 with count == MAX; the provisional header is the FIRST
+(topmost) candidate; **TEXT GUARD** — CONFIDENT only if every non-empty cell in that row is text
+(no number, no date), **tested on the topmost candidate only, no fall-through**; **zero candidates →
+AMBIGUOUS**; AMBIGUOUS → first-row-as-header with the uncertainty stated in the rendered text; a
+sheet with no non-empty cell has no identifiable header and is still rendered (never dropped, never
+raises). Each sheet renders an explicit **1-based row-number column** and a summary line naming the
+confident header row or stating the fallback. **A64, A65 and A66 are discharged on the code path.**
+Read-only sanity check on the ingested spreadsheets: the title-block sheets now resolve
+**CONFIDENT** to the real header (row 4), instead of the AMBIGUOUS no-op the withdrawn rule
+produced; one sheet is AMBIGUOUS because its widest row lies outside the first 10 — accepted by the
+spec (**a stated assumption beats a confident guess**).
+
+**NOT provable before the owner's single re-ingestion pass:** **A68** (each previously-dropped
+passage appears in a chunk) and **A80** (the spreadsheet that rendered 45 now reports the true 42) —
+both require re-ingestion, which this stage deliberately does **not** do. **A67** (Item 2) was
+discharged earlier on the code path; its A68 end-to-end half likewise awaits the pass.
+
+**Restored docstring line** in `_group_unstructured_elements` (removed by `2de0cfb`): *"Elements
+before the first heading are grouped under section_title=None."* — behaviour unchanged, docstring
+only.
+
+New tests: `tests/test_xlsx_header_detection.py` (7), self-built `.xlsx` under tmp_path, **no real
+corpus document and no real corpus content** (AGENTS.md rule 8). Suite: **99 → 106 passed**. No
+re-ingestion; nothing under `data/` touched; no `[OPEN]` item resolved; no retrieval/prompt change.
+Authority: **Answered by project owner on 2026-09-16.**

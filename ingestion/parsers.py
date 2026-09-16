@@ -201,24 +201,127 @@ def _parse_docx_fallback(file_path: str) -> list[ParsedSection]:
     return sections
 
 
+def _is_empty_cell(value) -> bool:
+    """A cell counts as empty when it is missing/NaN or blank after stripping."""
+    try:
+        import pandas as pd
+
+        if pd.isna(value):
+            return True
+    except Exception:  # noqa: BLE001 - not a pandas scalar; fall through to text
+        pass
+    return str(value).strip() == ""
+
+
+def _cell_is_text(value) -> bool:
+    """
+    SPEC §22.2 TEXT GUARD. An empty cell is ignored; a non-empty cell is TEXT
+    only if it is a string — a number or a date is not text.
+    """
+    if _is_empty_cell(value):
+        return True
+    return isinstance(value, str)
+
+
+def _detect_xlsx_header(raw_rows: list[list], max_scan: int = 10):
+    """
+    SPEC §22.2 — the header rule (amended 2026-09-16).
+
+    MAX is the greatest number of non-empty cells in any row of the sheet. A
+    CANDIDATE is a row among the FIRST 10 rows whose non-empty-cell count equals
+    MAX. The provisional header is the FIRST (topmost) candidate. TEXT GUARD:
+    detection is CONFIDENT only if every non-empty cell in that provisional
+    header row is TEXT (no number, no date); if that row contains any number or
+    date, detection is AMBIGUOUS. ONLY the topmost candidate is tested — there is
+    NO fall-through to the next candidate. Zero candidates is AMBIGUOUS. A sheet
+    with no non-empty cell at all has NO identifiable header.
+
+    Returns (state, header_index), state in {"confident", "ambiguous", "none"};
+    header_index is None unless confident.
+    """
+    widths = [sum(1 for cell in row if not _is_empty_cell(cell)) for row in raw_rows]
+    max_width = max(widths) if widths else 0
+    if max_width == 0:
+        return "none", None
+    candidates = [i for i, width in enumerate(widths[:max_scan]) if width == max_width]
+    if not candidates:
+        return "ambiguous", None
+    header_index = candidates[0]
+    if not all(_cell_is_text(cell) for cell in raw_rows[header_index]):
+        return "ambiguous", None
+    return "confident", header_index
+
+
+def _trimmed_width(rows: list[list]) -> int:
+    """Number of columns up to the last non-empty cell across the given rows."""
+    width = 0
+    for row in rows:
+        for j, cell in enumerate(row):
+            if not _is_empty_cell(cell):
+                width = max(width, j + 1)
+    return width
+
+
+def _cell_text(value) -> str:
+    return "" if _is_empty_cell(value) else str(value).strip()
+
+
 def parse_xlsx(file_path: str) -> list[ParsedSection]:
     """
-    Per spec Section 7.2: one text block per sheet — a markdown-style table
-    rendering plus a short auto-generated summary line. No query engine,
-    no multi-sheet joins (explicitly out of scope, Section 4.1).
+    Per SPEC §7.2: one text block per sheet — a markdown-style table rendering
+    plus a short auto-generated summary line. No query engine, no multi-sheet
+    joins (explicitly out of scope, Section 4.1).
+
+    Per SPEC §22.2 (Item 1): the real header row is DETECTED, not assumed, using
+    the amended header rule in `_detect_xlsx_header`. The data-row count is the
+    count of rows AFTER the header, and the rendered table carries an explicit
+    1-based row-number column so the count is visible and checkable. AMBIGUOUS
+    (zero candidates, or a number/date in the topmost candidate) falls back to
+    first-row-as-header and STATES that in the rendered sheet text.
     """
     import pandas as pd
 
+    raw_sheets = pd.read_excel(file_path, sheet_name=None, header=None, engine="openpyxl")
     sections: list[ParsedSection] = []
-    sheets = pd.read_excel(file_path, sheet_name=None, engine="openpyxl")
 
-    for sheet_name, df in sheets.items():
-        if df.empty:
-            continue
-        n_rows, n_cols = df.shape
-        columns = ", ".join(str(c) for c in df.columns)
-        summary = f"Sheet '{sheet_name}' has {n_rows} rows and columns: {columns}."
-        table_md = df.to_markdown(index=False)
+    for sheet_name, raw in raw_sheets.items():
+        rows = raw.values.tolist() if raw is not None else []
+        state, header_index = _detect_xlsx_header(rows)
+        if header_index is None:
+            header_index = 0
+        header_row = rows[header_index] if rows else []
+        data_rows = rows[header_index + 1:] if rows else []
+
+        n_cols = _trimmed_width([header_row] + data_rows)
+        columns = ["#"]
+        for j in range(n_cols):
+            name = _cell_text(header_row[j]) if j < len(header_row) else ""
+            columns.append(name if name else f"Column {j + 1}")
+        table_rows = []
+        for i, row in enumerate(data_rows, start=1):
+            table_rows.append(
+                [i] + [_cell_text(row[j]) if j < len(row) else "" for j in range(n_cols)]
+            )
+        table_md = pd.DataFrame(table_rows, columns=columns).to_markdown(index=False)
+
+        if state == "confident":
+            summary = (
+                f"Sheet '{sheet_name}' — confident header at row {header_index + 1} "
+                f"(1-based): {len(data_rows)} data rows, {n_cols} columns."
+            )
+        elif state == "ambiguous":
+            summary = (
+                f"Sheet '{sheet_name}' — header row not determined confidently "
+                f"(ambiguous shape): assuming the first row is the header. "
+                f"{len(data_rows)} data rows, {n_cols} columns."
+            )
+        else:
+            summary = (
+                f"Sheet '{sheet_name}' — no header row could be identified: "
+                f"assuming the first row is the header. "
+                f"{len(data_rows)} data rows, {n_cols} columns."
+            )
+
         text = f"{summary}\n\n{table_md}"
         sections.append(ParsedSection(section_title=sheet_name, text=text))
 
@@ -231,7 +334,8 @@ def _group_unstructured_elements(elements) -> list[ParsedSection]:
     most recent heading. Heading detection is by SHAPE (`_looks_like_heading`),
     not by element type alone — see issue #1: PDF `partition_pdf` labels body
     sentence fragments as `Title` while the real numbered headings arrive as
-    `ListItem`.
+    `ListItem`. Elements before the first heading are grouped under
+    section_title=None.
 
     SPEC §22.3 (Item 2) — NO TEXT IS DISCARDED AT GROUPING. A heading immediately
     followed by another heading (or a trailing heading at end of document) has no
