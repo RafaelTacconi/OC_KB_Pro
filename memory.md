@@ -1009,3 +1009,44 @@ for the rest of the session with no retry. Accepted for the PoC (restart is the 
 recorded here complete.
 
 ---
+
+### 2026-09-15 — CORRECTION to the mechanism entry (evidence strength); PC-01 DECIDED as correct strictness
+
+**PART 1 — CORRECTION: evidence strength on the PDF mechanism.** This corrects the earlier entry
+"2026-09-15 — PDF misalignment mechanism identified; NEW silent-content-loss defect (all formats);
+revised ingestion bundle; Tier 1 verified live on the UI" (left unedited). That entry states
+`parse_pdf` "uses `partition_pdf`'s fast (non-layout-aware) strategy." **That is an INFERENCE
+recorded as an observation — the code does not say it.** `ingestion/parsers.py` **lines 89 and 135**
+call `partition_pdf(filename=file_path)` with **no `strategy=` argument**, so `unstructured`'s
+default applies. Restated at the correct strength:
+- **DEMONSTRATED** (by direct re-parse on disk): the flat element list, the column interleaving,
+  the resulting wrong heading/body pairings — deterministic and reproducible, **23 sections
+  identical to the stored index**.
+- **INFERRED, NOT DEMONSTRATED:** *which* `partition_pdf` strategy produced it. The output is
+  **consistent with** a non-layout-aware parse. **Nothing more.**
+
+Everything else in that entry stands unchanged. **Do not change the call.** *Observation only:* the
+docstring at `parsers.py` line 128 describes this path as "layout-aware", which the evidence
+contradicts. No code or comment change.
+
+**PART 2 — CORRECTION: the xlsx wording.** Several entries and `state.md` describe the xlsx defect
+as "`parse_xlsx` `header=0`". **The code contains no `header` argument:** `parsers.py` line 213 is
+`pd.read_excel(file_path, sheet_name=None, engine="openpyxl")`, and `header=0` is **the pandas
+DEFAULT.** The defect is **real and unchanged** — physical row 1 is treated as the column headings —
+but anyone grepping for `header=0` will find nothing. Correct wording recorded once, here; the
+earlier entries and `state.md` wording are **not** edited.
+
+**PART 3 — PC-01 DECIDED: correct strictness, NOT a defect.** Owner decision, 2026-09-15. PC-01
+("Where do escalated breaks go and who receives them?") refuses even though the answer is in the
+rank-1 retrieved chunk. It is now classified as **CORRECT §18 STRICTNESS** — the open judgement call
+is **resolved in the tool's favour**. It is **NOT a defect.** Reason: in the corpus the escalation
+pack's destination appears only **incidentally** — a subordinate clause about an 11:00 deadline,
+plus a glossary definition — whereas **all 14 passing cases state their answer as a declarative
+fact**. The model distinguishing "mentioned in passing" from "specified" is close to intended §18
+behaviour. It is also the **third time** the tool has pointed at the same thin spot in that SOP.
+**Loosening the model's caution to paper over a weak document is the wrong trade.** Consequence:
+**the fix belongs in the SOP DOCUMENT, not the system prompt** — and it must **NOT** be made until
+the ingestion bundle is built and re-verified, or PC-01's meaning changes underneath us. This
+**SUPERSEDES** the classification in the earlier entry "DEFECT: over-refusal on retrieved material"
+(2026-09-15) — referred to by title, **not edited**. No `SPEC.md` change, no prompt change, no code.
+Authority: **Answered by project owner on 2026-09-15.**

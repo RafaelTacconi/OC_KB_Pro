@@ -151,8 +151,10 @@ does **not** revive the OCR reasoning against the vision route F8); (4) **page f
 bleed in chunk text AND running headers passing the heading test. **All four ship in ONE
 re-ingestion pass, across ALL FIVE Workspaces**; `GROUNDING_REGRESSION_POSITIVE.md` is the
 **before/after acceptance check**. **Nothing is approved to build yet — spec first; do not change
-retrieval settings, prompts, or `SPEC.md`.** Also still open: whether **PC-01** is a defect or
-correct §18 strictness; and the **OPEN-16** re-run at scale — **OPEN-16 still unanswered.**
+retrieval settings, prompts, or `SPEC.md`.** Also still open: **PC-01
+DECIDED 2026-09-15 as correct §18 strictness; the SOP wording is amended AFTER the ingestion
+bundle ships and is re-verified.** And the **OPEN-16** re-run at scale — **OPEN-16 still
+unanswered.**
 
 Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
 was built; correct anything you disagree with. **The xlsx row-count fix stays

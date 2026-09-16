@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Docs: CORRECTION — PDF strategy inferred not observed; xlsx "header=0" is the pandas default (no argument); PC-01 decided as correct §18 strictness, not a defect (no code change)
+
+---
+
 ## 2026-09-15 — Docs: PDF misalignment mechanism + new cross-format silent heading-loss defect measured on all 13 corpus files; ingestion bundle revised to four items; Tier 1 verified live on the UI (no code change)
 
 ---
