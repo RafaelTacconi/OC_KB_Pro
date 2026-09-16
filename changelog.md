@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-15 — Docs: PDF misalignment mechanism + new cross-format silent heading-loss defect measured on all 13 corpus files; ingestion bundle revised to four items; Tier 1 verified live on the UI (no code change)
+
+---
+
 ## 2026-09-15 — Docs: March 2026 date grounded (enquiry closed); PDF chunk titles/bodies misaligned; four-item deferred ingestion bundle consolidated (no code change)
 
 ---

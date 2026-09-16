@@ -829,6 +829,98 @@ pass.
    `page=null`.
 4. **Page-footer bleed** — e.g. "Page of | Internal use" inside the SOP "Key contacts" chunk.
 
+### 2026-09-15 — PDF misalignment mechanism identified; NEW silent-content-loss defect (all formats); revised ingestion bundle; Tier 1 verified live on the UI
+**PDF HEADING MISALIGNMENT — MECHANISM IDENTIFIED.** `ingestion/parsers.py::parse_pdf` uses
+`partition_pdf`'s **fast (non-layout-aware)** strategy, then `_group_unstructured_elements` walks a
+**flat** element list with a **"most recent heading wins"** rule. In a two-column layout the parser
+**interleaves the columns**, so a heading from the left column attaches to the next line of the
+RIGHT column. **Confirmed by re-running the parser on disk: deterministic, reproducible, 23
+sections identical to the stored index.** Not an off-by-one; **not** a failure to detect headings.
+**Tuning `_looks_like_heading` CANNOT fix it** — the correct headings are found and then paired
+with the wrong bodies. **DOCX is correct** because `partition_docx` preserves real document order
+and Word heading styles; the grouping code is shared, the input quality is not. **Page furniture**
+("Global Custody Operations Owner: … Side 1 of 2 …") passes the heading test and becomes a
+`section_title`. **Prevalence beyond this one card is UNKNOWN and must not be generalised.**
+
+**SEPARATE, PREVIOUSLY UNKNOWN DEFECT — SILENT CONTENT LOSS.** A **different bug** from the
+misalignment above and needing its own fix. `parsers.py:242` emits a section only if
+`current_texts` is non-empty, so a heading **immediately followed by another heading is DISCARDED
+with its text**. It lives in `_group_unstructured_elements`, **shared by the DOCX path**. Measured
+across all **13 distinct corpus files** (read-only re-parse, no re-ingestion):
+
+```
+file                                    type  headings sections dropped
+AML_Escalation_Procedure.docx           docx      6       7       0
+AML_Policy.pdf                          pdf       6       5       1
+AML_Thresholds.xlsx                     xlsx      0       1       0
+HR_Approval_Matrix.xlsx                 xlsx      0       1       0
+HR_Grievance_Policy.pdf                 pdf       5       6       0
+HR_Leave_Procedure.docx                 docx      6       7       0
+Incident_Response_Procedure.docx        docx      6       7       0
+NBCA_Daily_Operations_SOP.docx          docx     53      40      13
+NBCA_Exception_Matrix_Quick_Ref.xlsx    xlsx      0       7       0
+NBCA_Quick_Reference_Card.pdf           pdf      48      23      25
+NBCA_Training_Onboarding_Guide.docx     docx     36      27       9
+Security_Incident_Policy.pdf            pdf       6       5       1
+Severity_Thresholds.xlsx                xlsx      0       1       0
+```
+
+**SEVERITY DIFFERS BY FORMAT (explicit):**
+- **DOCX: LABELS lost, not content.** The 13 and 9 drops are mostly TOC duplicates and container
+  headings ("8. Senior notes", "9. Glossary and contacts", "2.1 Stage by stage", "3.3 Three breaks
+  worth understanding in detail") whose paragraph bodies still appear under their child headings.
+  Citations still show correct section names. Real but **minor**.
+- **PDF (two-column card): CONTENT lost.** 25 drops, all **gone entirely**, including genuine
+  content: "4 Sort by our_ref + value_date to spot duplicate pairs", "DUPLICATE_PAYMENT - same ref
+  + date twice", and the whole Key contacts block (Raman, Meyer, Dubois, Baumann). **These strings
+  exist in NO chunk of that file.**
+- **XLSX: IMMUNE.** `parse_xlsx` sets `section_title = sheet_name` and never enters the grouping
+  code.
+
+**WHY THIS MATTERS:** a refusal is supposed to mean the documents have a gap. Where content is
+dropped at ingestion, **a refusal means the PARSER has a gap, and nothing distinguishes the two on
+screen.** The damage here was masked only because the lost PDF contacts are duplicated in the SOP
+and the xlsx — the same redundancy effect already recorded for the image gap.
+
+**METHODOLOGY FINDING (prominent): the synthetic corpus CANNOT detect this class of defect.** Zero
+drops across all three synthetic `.docx`; one cosmetic title line per synthetic `.pdf`. The real
+documents dropped **13, 9 and 25**. Step 8, the adversarial suite, `GROUNDING_REGRESSION.md` and
+`tests/offline_retrieval_eval.py` all run on nine clean single-column files with **no table of
+contents, no nested headings and no multi-column layouts** — shapes too simple to exhibit the bug.
+The real corpus surfaced it within a day. **Argument for adding deliberately awkward documents
+(TOC, nested headings, two-column, page furniture) to the synthetic corpus. Nothing approved to
+build.**
+
+**REVISED DEFERRED INGESTION BUNDLE — SUPERSEDES the four-item list above.** Record only; nothing
+approved:
+1. **xlsx header detection** (`parse_xlsx` `header=0`) — the owner's two reservations stand.
+2. **Silent heading loss** (`parsers.py:242`) — **ALL formats** via the shared grouping code.
+   Contained fix, independent of any layout work.
+3. **PDF section labelling + page-number capture — MERGED.** Owner direction (2026-09-15): **STOP
+   inferring PDF section titles; label PDF chunks by PAGE NUMBER instead.** A page number is a
+   **checkable fact**; an inferred section title is a claim that can be wrong. The **layout-aware
+   parse option is REJECTED** for the same reason OCR was: heavy native Windows dependencies. **This
+   rejection is specific to a layout-aware PARSER and does NOT revive the old OCR reasoning against
+   the vision-model route (F8).**
+4. **Page furniture** — footer bleed inside chunk text AND running headers passing the heading
+   test. Same family, one item.
+
+All four ship in **ONE re-ingestion pass, across ALL FIVE Workspaces** (owner decision 2026-09-15),
+with `GROUNDING_REGRESSION_POSITIVE.md` as the before/after acceptance check.
+
+**TIER 1 LOGGING VERIFIED LIVE ON THE UI.** Three UI questions on 2026-09-15 wrote three correct
+rows to `data/logs.db` (**log_ids 34–36**): right workspace, right model slug, `source='ui'`,
+`lexical_degrade=0`, `error_type=None`, **no question or answer text**.
+- Two were **refusals** and **BOTH logged `outcome='answered'`** because `chunks_retrieved=5`. Two
+  more live instances of the **§19.6 under-count**, now demonstrated on the **UI** as well as the
+  API.
+- The HR "Severity 1" refusal was **CORRECT**: "Severity" appears in **zero chunks** of the HR
+  Workspace; that content exists only in **ITSEC and All Policies**. Recorded as **Workspace
+  segregation working as designed** and as a concrete illustration of **OPEN-10's cost**.
+- One row showed `retrieval_ms ≈ 22,400` against ≈20 ms for the others, consistent with first-use
+  **model warm-up**. Observation only — exactly the shape the **dashboard decision** anticipated
+  (averages hide it, slowest-10% does not). **Do not investigate.**
+
 ---
 
 ## Rejected approaches

@@ -4,7 +4,7 @@ Overwritten in place on every update. Keep under one page. Rules: `SPEC.md` §13
 This copy is written for a **human operator** (the project owner) — all build-order
 steps an implementing agent can complete are done; what remains needs you.
 
-**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); positive set run 15 bare questions → 14 correct / 1 refusal, so the earlier over-refusal entry is CORRECTED to 1/15 (an OPEN JUDGEMENT CALL, not a proven defect); PDF section titles confirmed misleading in citations; **PDF chunk titles/bodies found MISALIGNED (citation can point at a chunk lacking the content); March 2026 date verified grounded, enquiry closed; four-item deferred ingestion bundle consolidated (nothing approved to build)**; two earlier suspicions withdrawn; no fix approved**.
+**Last updated:** 2026-09-15 — Steps 1–7 + §14/§15/§16 + §7.14/§18 done; Step 8 RUN; **Tier 1 logging + localhost-only staging API BUILT (SPEC §19.6/§20.9-§20.13, A55–A63)**, with the UI refusal signal fixed to match the API; first real-document validation done (A29 partially discharged); xlsx row-count defect deferred by direction; **first live OPEN-16 measurement recorded in `memory.md` (evidence only — OPEN-16 still unanswered); positive set run 15 bare questions → 14 correct / 1 refusal, so the earlier over-refusal entry is CORRECTED to 1/15 (an OPEN JUDGEMENT CALL, not a proven defect); PDF section titles confirmed misleading in citations; **PDF chunk titles/bodies found MISALIGNED (citation can point at a chunk lacking the content); March 2026 date verified grounded, enquiry closed; PDF misalignment mechanism identified and a NEW cross-format silent heading-loss defect measured (DOCX labels, PDF content; synthetic corpus cannot detect it); ingestion bundle REVISED to four items (PDF → page-number labelling, layout-aware parse rejected); Tier 1 verified live on the UI (two refusals logged `answered` — §19.6); nothing approved to build**; two earlier suspicions withdrawn; no fix approved**.
 
 ---
 
@@ -140,17 +140,19 @@ repo `data/`. Run the suite with the app **stopped**.
 
 ## Next action
 
-**Spec the four-item ingestion bundle (spec first, then build).** Consolidate and specify, before
-any build: (1) **xlsx header detection** (`parse_xlsx` `header=0` bug, with the owner's two prior
-reservations); (2) **PDF heading extraction** — chunk titles/bodies are misaligned, so a citation
-can point at a chunk lacking the cited content (PC-11 passed with such a citation); (3)
-**page-number capture** — API `sources` always return `page=null`; (4) **page-footer bleed** (e.g.
-"Page of | Internal use" in the SOP "Key contacts" chunk). **All four travel in ONE re-ingestion
-pass**, and `GROUNDING_REGRESSION_POSITIVE.md` (**14 of 15 passing**; locating phrases, not chunk
-ids) is the **before/after acceptance check**. **Nothing is approved to build yet — spec first; do
-not change retrieval settings, prompts, or `SPEC.md`.** Also still open: decide whether **PC-01**
-is a defect or correct §18 strictness; and the **OPEN-16** re-run at scale (rank + distinct-doc
-count) — **OPEN-16 still unanswered.**
+**Spec the revised four-item ingestion bundle (spec first, then build).** Consolidate and specify,
+before any build: (1) **xlsx header detection** (`parse_xlsx` `header=0` bug, owner's two prior
+reservations stand); (2) **silent heading loss** (`parsers.py:242` — a heading immediately followed
+by another heading is discarded; **ALL formats** via the shared grouping code; contained, layout-
+independent); (3) **PDF section labelling + page-number capture, MERGED** — owner direction: **stop
+inferring PDF section titles, label PDF chunks by page number** (a page number is a checkable fact;
+a layout-aware parse is REJECTED — heavy native Windows deps; that rejection is parser-specific and
+does **not** revive the OCR reasoning against the vision route F8); (4) **page furniture** — footer
+bleed in chunk text AND running headers passing the heading test. **All four ship in ONE
+re-ingestion pass, across ALL FIVE Workspaces**; `GROUNDING_REGRESSION_POSITIVE.md` is the
+**before/after acceptance check**. **Nothing is approved to build yet — spec first; do not change
+retrieval settings, prompts, or `SPEC.md`.** Also still open: whether **PC-01** is a defect or
+correct §18 strictness; and the **OPEN-16** re-run at scale — **OPEN-16 still unanswered.**
 
 Then, for the owner: **`SPEC.md` §19.6 / §20.9–§20.13 / A55–A62** describe what
 was built; correct anything you disagree with. **The xlsx row-count fix stays
