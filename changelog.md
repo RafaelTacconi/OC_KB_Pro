@@ -7,6 +7,10 @@ A step with no entry here is not done.
 
 ---
 
+## 2026-09-16 — Fix `scripts/reingest_all.py`: run `init_db()` + `migrate_db()` before the pass (else every insert fails with no `page` column) + 1 test
+
+---
+
 ## 2026-09-16 — Build §22 stage 2: PDF page numbers + `chunks.page` migration (A69–A73), repetition-based furniture (A74/A75), stale-citation UI (A77), re-ingestion tool `scripts/reingest_all.py` (A82) + 16 tests
 
 ---

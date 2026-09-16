@@ -1253,3 +1253,21 @@ Tests: `tests/test_ingestion_bundle_stage2.py` (16), purpose-built inputs under 
 corpus document and no real corpus content** (AGENTS.md rule 8). Suite: **106 → 122 passed**. No
 retrieval/prompt change; no `[OPEN]` item resolved.
 Authority: **Answered by project owner on 2026-09-16.**
+
+### 2026-09-16 — Ordering defect in `scripts/reingest_all.py`: schema not migrated before inserts — fixed
+**Defect found before the owner ran the pass.** The script's chunk inserts now carry a `page` value,
+but `chunks.page` is added only by `db.migrate_db()`, which the app calls from
+`config.bootstrap()` — i.e. only when Streamlit starts. The script called neither `init_db()` nor
+`migrate_db()`, so run against a database the new app had not yet opened, **every insert would
+fail** (no `page` column). **Fix: `main()` now calls the app's same idempotent path — `init_db()`
+then `migrate_db()` — before any counting or re-ingestion, and prints one line, "Schema checked
+(init_db + migrate_db)."** The migration itself is unchanged; no new migration; no other behaviour of
+the script changed; it remains a **tool, not a test**, and still deletes nothing under `data/`.
+**The script was NOT run; no re-ingestion happened; `data/` was not touched.**
+
+New test:
+`tests/test_ingestion_bundle_stage2.py::test_script_migrates_a_database_without_the_page_column` —
+a temporary DB with a `chunks` table lacking `page`, built under tmp_path; the script's entry point
+brings the schema up to date instead of raising, and no real re-ingestion occurs. Suite: **122 → 123
+passed**. No `[OPEN]` item resolved; no retrieval/prompt change; no criterion edited.
+Authority: **Answered by project owner on 2026-09-16.**

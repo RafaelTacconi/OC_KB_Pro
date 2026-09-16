@@ -25,7 +25,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from db import get_connection
+from db import get_connection, init_db, migrate_db
 from ingestion.pipeline import reingest_source
 
 # SPEC §22.6 — all five Workspaces, re-ingested in one pass.
@@ -73,6 +73,14 @@ def _stored_path(workspace_id: str, source: dict) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     print("Re-ingestion pass for SPEC §22 (five Workspaces). Nothing under data/ is deleted.")
+    # Same idempotent migration path the app uses (config.bootstrap calls
+    # init_db() then migrate_db()). Run it here so the schema is correct
+    # whatever order the owner does things in — the script must not depend on
+    # the app having opened the database first (chunks.page is added by
+    # migrate_db, and every insert carries a page value).
+    init_db()
+    migrate_db()
+    print("Schema checked (init_db + migrate_db).")
     for workspace_id in WORKSPACES:
         docs_before, chunks_before = _counts(workspace_id)
         print(

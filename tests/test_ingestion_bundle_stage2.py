@@ -295,3 +295,23 @@ def test_reingest_script_is_a_tool_not_a_test():
         "524bf0ec5c5f4290a80438fd801455ce",
         "d93d5cd12269400e9298c535062afc65",
     ]
+
+
+def test_script_migrates_a_database_without_the_page_column(monkeypatch, tmp_path):
+    # The script must not depend on the app having opened the database first:
+    # chunks.page is added by migrate_db(), and every insert carries a page value.
+    monkeypatch.chdir(tmp_path)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    legacy = data_dir / "workspace_app.db"
+    conn = sqlite3.connect(legacy)
+    conn.executescript(_LEGACY_CHUNKS_SQL)
+    conn.commit()
+    conn.close()
+    assert "page" not in _columns(legacy, "chunks")
+
+    module = importlib.import_module("scripts.reingest_all")
+    rc = module.main([])  # no sources under this tmp data/, so nothing is re-ingested
+
+    assert rc == 0
+    assert "page" in _columns(legacy, "chunks")
